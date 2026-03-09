@@ -5,8 +5,8 @@
   "type": "module",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js",
+    "start": "node src/models/migrate.js && node src/index.js",
+    "dev": "nodemon src/index.js",
     "db:migrate": "node src/models/migrate.js"
   },
   "dependencies": {
