@@ -51,7 +51,51 @@ ADVANCED PRINCIPLES:
 30. Role + Task + Format is the minimum viable prompt structure
 `;
 
-// ── Type-Specific Expert System Prompts ─────────────────────────────────────
+const ADVANCED_PRINCIPLES_V2 = `
+ADVANCED PROMPT ENGINEERING PRINCIPLES (Phase 1 — Extended Research):
+
+HALLUCINATION MITIGATION:
+31. Always ask for confidence levels: HIGH/MEDIUM/LOW on key claims
+32. Instruct the model to flag uncertainty explicitly
+33. Ask the model to state what it does NOT know
+34. Request methodology limitations to be surfaced upfront
+35. Never let the model assume missing data — ask it to flag gaps
+
+CONSTRAINT-BASED PROMPTING:
+36. Constraints drive better output — unlimited options paralyze the model
+37. Always set specific constraints: budget, timeline, word count, stack
+38. Define performance requirements explicitly (e.g. "under 1 second")
+39. Specify allowed dependencies, tools, or libraries upfront
+40. Negative constraints (what NOT to use) are as powerful as positive ones
+
+AUDIENCE-CENTRIC PROMPTING:
+41. Audience definition changes everything — always specify who reads this
+42. CEO audience = business impact + 1-2 recommendations only
+43. Analyst audience = detailed findings + methodology + raw data
+44. Technical audience = precision, edge cases, implementation details
+45. General audience = plain language, analogies, no jargon
+
+STRUCTURAL PROPORTIONALITY:
+46. Summarization should match source proportions
+47. Quote important phrases rather than paraphrasing key findings
+48. Chunk information: max 3-5 concepts per section
+49. Never dump everything at once — sequence information logically
+50. Structure output length proportional to input complexity
+
+ITERATIVE WORKFLOW CHAINING:
+51. Never rely on single zero-shot prompts for complex tasks
+52. Chain prompts: Generate → Validate → Score → Refine
+53. Build self-review steps into every complex prompt
+54. Ask the model to score its own output before returning it
+55. Include iteration instructions: "If output score < 8/10, regenerate"
+
+FEW-SHOT + EDGE CASES:
+56. Always show the model how to handle invalid/missing inputs
+57. Include at least one edge case in every technical prompt
+58. Negative examples prevent more errors than positive examples
+59. Show the exact format you want with real data, not placeholders
+60. Three examples > one example — always aim for 3 shots minimum
+`;
 const TYPE_SYSTEM_PROMPTS = {
   image: `You are an expert AI image prompt engineer specializing in Midjourney, DALL-E 3, and Stable Diffusion.
 
@@ -518,6 +562,8 @@ ${typePrompt}
 
 ${RESEARCH_PRINCIPLES}
 
+${ADVANCED_PRINCIPLES_V2}
+
 PRIVATE PLANNING (do NOT output this section):
 - Identify the best-matching domain (if any)
 - Identify the user's real goal (what success looks like)
@@ -562,6 +608,19 @@ You are generating a prompt for the "${template.name}" domain (${template.domain
     }
   }
 
+  systemPrompt += `
+
+SELF-REVIEW RULE:
+Every prompt you generate must end with this section:
+
+"SELF-CHECK BEFORE YOU RESPOND:
+Rate your planned response:
+- Is the task crystal clear? (1-3)
+- Are all requirements specific? (1-3)
+- Is the audience defined? (1-3)
+If total score is below 7 — revise your approach first."
+`;
+
   return systemPrompt;
 }
 
@@ -588,7 +647,17 @@ async function callGroq(userRequest, systemPrompt) {
       model: MODEL,
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Transform this request into a perfect prompt: ${userRequest}` },
+        { role: 'user', content: `Transform this into a perfect prompt.
+
+Apply these specific techniques:
+1. Define the AUDIENCE explicitly (who will use this output?)
+2. Add CONFIDENCE LEVEL instructions if factual claims are involved
+3. Set specific CONSTRAINTS (budget, length, format, tools)
+4. Use COSTAR or RISEN framework structure
+5. Include at least ONE edge case or negative example
+6. End with a SELF-REVIEW instruction
+
+User request: ${userRequest}` },
       ],
       temperature: 0.7,
       max_tokens: 1200,
@@ -635,6 +704,30 @@ export async function generateWithAI(userRequest) {
     const data = await callGroq(userRequest, systemPrompt);
     const text = data.choices?.[0]?.message?.content?.trim();
     if (!text) throw new Error('Empty response from AI');
+
+    // Auto retry if quality is low
+    const wordCount = text.split(' ').length;
+    const hasRole = /role|you are/i.test(text);
+    const hasTask = /task|objective|goal/i.test(text);
+    const isImageType = isImageRequest;
+
+    if (!isImageType && (wordCount < 80 || (!hasRole && !hasTask))) {
+      logger.debug('Low quality detected, retrying with stricter prompt');
+      const retryData = await callGroq(
+        userRequest + '\n\nSTRICT: Response MUST include ROLE, TASK, REQUIREMENTS sections. Minimum 200 words. Apply COSTAR framework.',
+        systemPrompt
+      );
+      const retryText = retryData.choices?.[0]?.message?.content?.trim();
+      if (retryText && retryText.split(' ').length > wordCount) {
+        return {
+          prompt: retryText,
+          model: MODEL,
+          source: 'groq',
+          domain: detectedDomain,
+          detectedType: isImageRequest ? 'image' : detectedType,
+        };
+      }
+    }
 
     logger.debug('AI prompt generated', {
       model: MODEL,
