@@ -332,6 +332,62 @@ OUTPUT FORMAT:
   ],
 };
 
+// ── Output format rules based on request type ───────────────────────────────
+const OUTPUT_FORMAT_RULES = {
+  image: `IMPORTANT: For image/photo/visual requests — output a SHORT image generation prompt (2-4 sentences max).
+Format: [style], [subject], [setting], [mood], [technical details]
+Example: Warm cinematic photo of a happy family of 4 sitting on a picnic blanket in a sunny park, golden hour lighting, shot on 85mm lens, shallow depth of field, authentic candid moment
+Do NOT output a photographer brief or technical document. Just the prompt.`,
+
+  code: `IMPORTANT: For code requests — output a code prompt with:
+- Programming language and version
+- Framework/library context
+- Function/class signature needed
+- Example input/output
+- Edge cases and error handling requirements`,
+
+  writing: `IMPORTANT: For writing requests — output a content brief with:
+- Target audience and tone
+- Exact format (blog, email, social post)
+- Word count or length constraints
+- Key points to cover
+- Call to action`,
+
+  research: `IMPORTANT: For research requests — output a research brief with:
+- Clear research question
+- Scope boundaries (include/exclude)
+- Source preferences
+- Output format needed
+- Depth level required`,
+
+  planning: `IMPORTANT: For planning requests — output a planning brief with:
+- Clear goal and success metrics
+- Constraints (budget, timeline, resources)
+- Timeline and milestones
+- Risk factors to consider`,
+
+  agent: `IMPORTANT: For agent/GPT requests — output a persona brief with:
+- Detailed persona and background
+- Capabilities and expertise
+- Hard boundaries
+- Tone and communication style
+- Example interactions`,
+
+  automation: `IMPORTANT: For automation requests — output a workflow brief with:
+- Trigger event description
+- Step-by-step workflow
+- Conditional logic
+- Error handling
+- Data transformation steps`,
+
+  default: `IMPORTANT: Output a complete, structured prompt with:
+- Clear role definition
+- Specific task description
+- Detailed requirements
+- Constraints and edge cases
+- Expected output format`,
+};
+
 function buildFewShotSection(detectedDomain) {
   const domainShots = (detectedDomain && FEW_SHOTS[detectedDomain]) || [];
   const genericShots = FEW_SHOTS.generic || [];
@@ -474,7 +530,9 @@ STRICT OUTPUT RULES:
 - Be specific and measurable — no vague words without defining them
 - Aim for 250-600 words depending on complexity
 - The result must be immediately copy-pasteable into ChatGPT, Claude, Gemini, or any AI tool
-- Apply ALL principles above — your output must score 28+ on quality`;
+- Apply ALL principles above — your output must score 28+ on quality
+
+${OUTPUT_FORMAT_RULES[detectedType] || OUTPUT_FORMAT_RULES.default}`;
 
   systemPrompt += buildFewShotSection(detectedDomain);
 
@@ -507,9 +565,50 @@ You are generating a prompt for the "${template.name}" domain (${template.domain
   return systemPrompt;
 }
 
+// ── Image-specific system prompt ─────────────────────────────────────────────
+const IMAGE_SYSTEM_PROMPT = `You are an expert at writing image generation prompts for Midjourney, DALL-E, and Stable Diffusion.
+
+Output ONLY a short 2-4 sentence image prompt. Include subject, style, mood, lighting, technical details. No headers, no bullet points, no explanations. Just the prompt.
+
+Format: [style], [subject], [setting], [mood], [technical details]
+
+Example: Warm cinematic photo of a happy family of 4 sitting on a picnic blanket in a sunny park, golden hour lighting, shot on 85mm lens, shallow depth of field, authentic candid moment`;
+
+// ── Groq API call helper ─────────────────────────────────────────────────────
+async function callGroq(userRequest, systemPrompt) {
+  const apiKey = process.env.GROQ_API_KEY;
+  
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Transform this request into a perfect prompt: ${userRequest}` },
+      ],
+      temperature: 0.7,
+      max_tokens: 1200,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Groq API error ${res.status}`);
+  }
+
+  return res.json();
+}
+
 // ── Main AI generation function ───────────────────────────────────────────────
 export async function generateWithAI(userRequest) {
   const apiKey = process.env.GROQ_API_KEY;
+
+  // Detect image request at the top
+  const isImageRequest = /photo|image|picture|illustration|draw|render|visual|portrait|artwork/i.test(userRequest);
 
   // Detect domain and prompt type from user request
   const detectedDomain = detectDomain(userRequest);
@@ -528,31 +627,12 @@ export async function generateWithAI(userRequest) {
   }
 
   try {
-    const systemPrompt = buildSystemPrompt(detectedDomain, detectedType);
+    // Use specialized image system prompt for image requests
+    const systemPrompt = isImageRequest 
+      ? IMAGE_SYSTEM_PROMPT 
+      : buildSystemPrompt(detectedDomain, detectedType);
 
-    const res = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Transform this request into a perfect prompt: ${userRequest}` },
-        ],
-        temperature: 0.7,
-        max_tokens: 1200,
-      }),
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `Groq API error ${res.status}`);
-    }
-
-    const data = await res.json();
+    const data = await callGroq(userRequest, systemPrompt);
     const text = data.choices?.[0]?.message?.content?.trim();
     if (!text) throw new Error('Empty response from AI');
 
@@ -560,7 +640,7 @@ export async function generateWithAI(userRequest) {
       model: MODEL,
       tokens: data.usage?.total_tokens,
       domain: detectedDomain || 'generic',
-      type: detectedType,
+      type: isImageRequest ? 'image' : detectedType,
     });
 
     return {
@@ -568,7 +648,7 @@ export async function generateWithAI(userRequest) {
       model: MODEL,
       source: 'groq',
       domain: detectedDomain,
-      detectedType,
+      detectedType: isImageRequest ? 'image' : detectedType,
     };
 
   } catch (err) {

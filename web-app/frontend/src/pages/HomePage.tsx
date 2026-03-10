@@ -228,7 +228,7 @@ function AIGenerator() {
       <div className="w-full max-w-3xl mx-auto">
         {/* Main Input Container */}
         <div
-          className="relative rounded-3xl overflow-hidden transition-all duration-300"
+          className="relative rounded-3xl transition-all duration-300"
           style={{
             background: 'rgba(255, 255, 255, 0.03)',
             border: '1px solid rgba(139, 92, 246, 0.25)',
