@@ -44,12 +44,189 @@ COMPLETENESS PRINCIPLES:
 25. Specify what happens if information is missing or unclear
 
 ADVANCED PRINCIPLES:
-26. Chain-of-thought: ask AI to reason step by step for complex problems
+26. Do a private planning pass before writing the final prompt (domain, goal, audience, constraints)
 27. Few-shot examples dramatically improve output quality
 28. Negative examples (what NOT to do) are as powerful as positive ones
 29. Iterative refinement: build in a self-review step
 30. Role + Task + Format is the minimum viable prompt structure
 `;
+
+const FEW_SHOTS = {
+  generic: [
+    `User request: "help me with a task"
+Bad prompt: "Do this for me"
+Expert prompt:
+ROLE: You are a senior problem-solving assistant.
+TASK: Clearly restate the task, identify missing information, and propose a concrete plan.
+REQUIREMENTS:
+- Ask for any critical missing context
+- Break the work into clear, numbered steps
+- Highlight risks and edge cases
+OUTPUT FORMAT:
+- Restated task
+- Assumptions
+- Step-by-step plan`,
+  ],
+  'email-writing': [
+    `User request: "write an email"
+Bad prompt: "Write me an email"
+Expert prompt:
+ROLE: You are a senior business communication expert.
+TASK: Write a professional follow-up email.
+REQUIREMENTS:
+- Warm but concise tone (≤120 words)
+- Clear ask + next step
+- Subject line included
+CONSTRAINTS:
+- Avoid jargon and filler
+OUTPUT FORMAT:
+- Subject:
+- Email body:`,
+  ],
+  'data-analysis': [
+    `User request: "analyze my data"
+Bad prompt: "Analyze this data and give insights"
+Expert prompt:
+ROLE: You are a senior data analyst.
+TASK: Perform a comprehensive analysis of the provided dataset.
+REQUIREMENTS:
+- Summarize the dataset (rows/cols, types, missingness)
+- Identify trends, outliers, and key drivers
+- Provide 5 actionable insights with evidence
+CONSTRAINTS:
+- If data is missing, state assumptions explicitly
+OUTPUT FORMAT:
+- Executive summary (bullets)
+- Key findings
+- Recommended actions`,
+  ],
+  'code-generation': [
+    `User request: "help me debug my code"
+Bad prompt: "Fix my code"
+Expert prompt:
+ROLE: You are a senior software engineer and debugging specialist.
+TASK: Diagnose the bug and propose a minimal, correct fix.
+REQUIREMENTS:
+- Ask for missing context (runtime, expected vs actual)
+- Identify likely root cause(s)
+- Provide a fix with explanation and a quick test plan
+CONSTRAINTS:
+- Do not guess APIs; be explicit about uncertainty
+OUTPUT FORMAT:
+- Diagnosis
+- Fix (with code)
+- Test plan`,
+  ],
+  'content-writing': [
+    `User request: "write a blog post"
+Bad prompt: "Write a blog about X"
+Expert prompt:
+ROLE: You are a senior content strategist and copywriter.
+TASK: Write a blog post optimized for clarity and engagement.
+REQUIREMENTS:
+- Define target audience and reading level
+- Include outline, headings, and approximate length
+- Specify tone (e.g. friendly, expert, contrarian)
+OUTPUT FORMAT:
+- Prompt with ROLE, TASK, CONTEXT, OUTLINE, STYLE, OUTPUT FORMAT`,
+  ],
+  'customer-service': [
+    `User request: "reply to this angry customer"
+Bad prompt: "Answer this customer"
+Expert prompt:
+ROLE: You are a senior customer support specialist.
+TASK: Draft a response that de-escalates the situation and offers a fair resolution.
+REQUIREMENTS:
+- Acknowledge emotions
+- Take responsibility where appropriate
+- Offer 2–3 concrete next steps
+CONSTRAINTS:
+- Do not promise anything that support agents cannot actually do
+OUTPUT FORMAT:
+- Response text
+- Short rationale for tone/choices`,
+  ],
+  'research-summarization': [
+    `User request: "summarize this research paper"
+Bad prompt: "Summarize this"
+Expert prompt:
+ROLE: You are a senior research analyst.
+TASK: Summarize the paper for a non-expert stakeholder.
+REQUIREMENTS:
+- One-paragraph plain-language summary
+- 3–5 key findings
+- 3 implications or recommendations
+OUTPUT FORMAT:
+- Plain summary
+- Bullet list of key findings
+- Bullet list of implications`,
+  ],
+  'teaching-explanation': [
+    `User request: "explain X like I'm 5"
+Bad prompt: "Explain X simply"
+Expert prompt:
+ROLE: You are an experienced teacher.
+TASK: Explain the concept using analogies and step-by-step reasoning.
+REQUIREMENTS:
+- Start from what the learner already knows
+- Use one central analogy throughout
+- End with a quick check-for-understanding exercise
+OUTPUT FORMAT:
+- Explanation
+- Analogy
+- 3 self-check questions`,
+  ],
+  'product-management': [
+    `User request: "prioritize my roadmap"
+Bad prompt: "Help me with my roadmap"
+Expert prompt:
+ROLE: You are a senior product manager.
+TASK: Help prioritize a product roadmap using a clear framework.
+REQUIREMENTS:
+- Ask for goals, constraints, and candidate items
+- Apply a scoring/stack-ranking framework (e.g. RICE)
+- Surface trade-offs and risks
+OUTPUT FORMAT:
+- Clarifying questions
+- Prioritized list with scores
+- Risks and recommendations`,
+  ],
+  'creative-brainstorming': [
+    `User request: "give me ideas"
+Bad prompt: "Give me some ideas"
+Expert prompt:
+ROLE: You are a creative director and ideation partner.
+TASK: Generate a wide set of creative options, then narrow them down.
+REQUIREMENTS:
+- Start by clarifying constraints (budget, channel, audience)
+- Generate at least 10 diverse ideas
+- Highlight 3 best ideas with pros/cons
+OUTPUT FORMAT:
+- Clarifying questions
+- Idea list
+- Top 3 with pros/cons`,
+  ],
+  'social-media': [
+    `User request: "write posts for social media"
+Bad prompt: "Write social posts"
+Expert prompt:
+ROLE: You are a senior social media strategist.
+TASK: Generate platform-specific posts optimized for engagement.
+REQUIREMENTS:
+- Ask which platforms and brand voice
+- Include hooks, CTAs, and hashtags where appropriate
+OUTPUT FORMAT:
+- Platform-by-platform prompts with ROLE, TASK, CONTEXT, STYLE, OUTPUT FORMAT`,
+  ],
+};
+
+function buildFewShotSection(detectedDomain) {
+  const domainShots = (detectedDomain && FEW_SHOTS[detectedDomain]) || [];
+  const genericShots = FEW_SHOTS.generic || [];
+  const picked = [...genericShots, ...domainShots].slice(0, 3);
+  if (!picked.length) return '';
+  return `\n\nFEW-SHOT EXAMPLES (bad → expert prompt):\n\n${picked.join('\n\n---\n\n')}\n`;
+}
 
 // ── Domain Detection: maps user request keywords to template IDs ─────────────
 const DOMAIN_KEYWORDS = {
@@ -135,6 +312,13 @@ When given a user's simple request, you transform it into a perfect, production-
 
 ${RESEARCH_PRINCIPLES}
 
+PRIVATE PLANNING (do NOT output this section):
+- Identify the best-matching domain (if any)
+- Identify the user's real goal (what success looks like)
+- Identify the target audience for the final output
+- Identify constraints, missing info, and risks
+- Then write the final prompt
+
 STRICT OUTPUT RULES:
 - Output ONLY the prompt itself — no preamble, no "Here is your prompt:", no meta-commentary
 - Always include: role definition, specific task, detailed requirements, constraints, expected output format
@@ -143,6 +327,8 @@ STRICT OUTPUT RULES:
 - Aim for 250-600 words depending on complexity
 - The result must be immediately copy-pasteable into ChatGPT, Claude, Gemini, or any AI tool
 - Apply ALL 30 principles above — your output must score 28+ on quality`;
+
+  systemPrompt += buildFewShotSection(detectedDomain);
 
   // Inject domain-specific template context if detected
   if (template) {

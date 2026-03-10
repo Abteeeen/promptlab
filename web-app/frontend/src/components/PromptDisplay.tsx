@@ -3,21 +3,35 @@ import type { GenerateResult } from '../types'
 import { QualityScore, QualityScoreMini } from './QualityScore'
 import { Button } from './ui/Button'
 
+type PromptDisplayState = { selectedIndex: number; editedText: string }
+
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
+  const [failed, setFailed] = useState(false)
 
   const copy = async () => {
-    await navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setFailed(false)
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      setFailed(true)
+      setTimeout(() => setFailed(false), 2500)
+    }
   }
 
   return (
-    <Button size="sm" variant={copied ? 'primary' : 'secondary'} onClick={copy}>
+    <Button size="sm" variant={copied ? 'primary' : failed ? 'secondary' : 'secondary'} onClick={copy}>
       {copied ? (
         <>
           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>
           Copied!
+        </>
+      ) : failed ? (
+        <>
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.6 2.6 17a2 2 0 0 0 1.7 3h15.4a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0Z"/></svg>
+          Copy failed
         </>
       ) : (
         <>
@@ -29,7 +43,7 @@ function CopyButton({ text }: { text: string }) {
   )
 }
 
-export function PromptDisplay({ result }: { result: GenerateResult }) {
+export function PromptDisplay({ result, onStateChange, onCopy }: { result: GenerateResult; onStateChange?: (s: PromptDisplayState) => void; onCopy?: () => void }) {
   const [selected, setSelected] = useState(0)
   const [showScore, setShowScore] = useState(false)
   const [edited, setEdited]       = useState(result.variations[0].text)
@@ -38,6 +52,7 @@ export function PromptDisplay({ result }: { result: GenerateResult }) {
   const handleTabChange = (i: number) => {
     setSelected(i)
     setEdited(result.variations[i].text)
+    onStateChange?.({ selectedIndex: i, editedText: result.variations[i].text })
   }
 
   return (
@@ -62,11 +77,17 @@ export function PromptDisplay({ result }: { result: GenerateResult }) {
             <QualityScoreMini data={result.qualityScore} />
             <span className="text-xs text-gray-600">· Edit freely below</span>
           </div>
-          <CopyButton text={edited} />
+          <div onClickCapture={() => onCopy?.()}>
+            <CopyButton text={edited} />
+          </div>
         </div>
         <textarea
           value={edited}
-          onChange={e => setEdited(e.target.value)}
+          onChange={e => {
+            const next = e.target.value
+            setEdited(next)
+            onStateChange?.({ selectedIndex: selected, editedText: next })
+          }}
           className="w-full bg-transparent p-4 text-sm text-gray-200 font-mono leading-relaxed focus:outline-none resize-none"
           style={{ minHeight: '200px', maxHeight: '360px' }}
           spellCheck={false}

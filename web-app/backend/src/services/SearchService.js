@@ -1,5 +1,9 @@
 import { loadTemplates } from './TemplateService.js';
 
+function escapeRegExp(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /**
  * Keyword-based template search.
  * Falls back gracefully when OpenAI is not configured.
@@ -20,7 +24,8 @@ export function searchTemplates(query) {
     let score = 0;
     for (const term of terms) {
       // Exact substring match
-      const occurrences = (searchable.match(new RegExp(term, 'g')) || []).length;
+      const safe = escapeRegExp(term);
+      const occurrences = (searchable.match(new RegExp(safe, 'g')) || []).length;
       score += occurrences;
 
       // Bonus: term in name or category is more relevant

@@ -36,14 +36,27 @@ export function Header() {
         })}
       </nav>
 
-      {/* CTA */}
-      <Link
-        to="/generate"
-        className="hidden md:inline-flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-brand shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 hover:opacity-90 transition-all"
-      >
-        <span>Generate</span>
-        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-      </Link>
+      {/* CTA + Agent (coming soon) */}
+      <div className="hidden md:flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            // lightweight “coming soon” affordance
+            alert('Agents are coming soon — you\'ll be able to design custom GPT-style assistants here.')
+          }}
+          className="inline-flex items-center gap-1.5 h-9 px-3 rounded-xl text-xs font-semibold text-gray-300 bg-white/5 border border-dashed border-white/20 hover:bg-white/10 transition-all"
+        >
+          <span>Agent</span>
+          <span className="text-[10px] text-gray-500">(coming soon)</span>
+        </button>
+        <Link
+          to="/generate"
+          className="inline-flex items-center gap-2 h-9 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-brand shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 hover:opacity-90 transition-all"
+        >
+          <span>Generate</span>
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </Link>
+      </div>
     </header>
   )
 }

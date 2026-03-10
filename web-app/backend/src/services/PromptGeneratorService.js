@@ -4,7 +4,7 @@ import { getTemplateById } from './TemplateService.js';
  * Replace [BRACKET] placeholders in a template string with form values.
  */
 function fillBrackets(template, formData) {
-  return template.replace(/\[([A-Z_/\s]+)\]/g, (match, key) => {
+  return template.replace(/\[([A-Z][A-Z0-9_/\s]{1,80})\]/g, (match, key) => {
     const normalizedKey = key.trim();
     return formData[normalizedKey] || formData[normalizedKey.replace(/\s/g, '_')] || match;
   });
@@ -14,7 +14,7 @@ function fillBrackets(template, formData) {
  * Generate variation 2: adds "Be thorough and include examples." prefix block.
  */
 function makeDetailedVariation(base) {
-  return `${base}\n\nAdditional instruction: Be thorough, include concrete examples where helpful, and explain your reasoning step by step.`;
+  return `${base}\n\nAdditional instruction: Be thorough, include concrete examples where helpful, and explain key assumptions and decision criteria.`;
 }
 
 /**

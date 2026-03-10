@@ -2,16 +2,31 @@ import type { Template, FormStructure, GenerateResult, SearchResult, FormData } 
 
 const BASE = ((import.meta as any).env?.VITE_API_URL || '') + '/api'
 
+async function readJsonSafe(res: Response): Promise<any> {
+  const ct = res.headers.get('content-type') || ''
+  if (ct.includes('application/json')) {
+    return res.json().catch(() => null)
+  }
+  const text = await res.text().catch(() => '')
+  return text ? { error: text } : null
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const sessionId = getSessionId()
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', 'X-Session-Id': sessionId, ...options?.headers },
     ...options,
   })
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(err.error || 'Request failed')
+    const err = await readJsonSafe(res)
+    const msg =
+      (err && typeof err === 'object' && 'error' in err && typeof (err as any).error === 'string' && (err as any).error) ||
+      res.statusText ||
+      `Request failed (${res.status})`
+    throw new Error(msg)
   }
-  return res.json()
+  const data = await readJsonSafe(res)
+  return data as T
 }
 
 export const api = {

@@ -60,7 +60,7 @@ function DimBar({ label, score, max = 3 }: { label: string; score: number; max?:
 }
 
 export function QualityScore({ data }: { data: QS }) {
-  const colors = RATING_COLORS[data.rating]
+  const colors = (RATING_COLORS as any)[data.rating] || RATING_COLORS['Okay']
 
   return (
     <div className="glass p-5 animate-fade-in">
@@ -82,7 +82,7 @@ export function QualityScore({ data }: { data: QS }) {
 }
 
 export function QualityScoreMini({ data }: { data: QS }) {
-  const colors = RATING_COLORS[data.rating]
+  const colors = (RATING_COLORS as any)[data.rating] || RATING_COLORS['Okay']
   const pct = Math.round(data.overallScore / 30 * 100)
   return (
     <div className="flex items-center gap-3 px-3 py-2 rounded-xl" style={{ background: colors.bg, border: `1px solid ${colors.ring}30` }}>

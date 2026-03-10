@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react'
-import { useSearchParams, Link } from 'react-router-dom'
+vsimport React, { useEffect, useState, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api } from '../services/api'
 import type { Template, FormStructure, GenerateResult, FormData } from '../types'
 import { TemplateCard } from '../components/TemplateCard'
@@ -51,9 +51,14 @@ export function GeneratorPage() {
   const [formData, setFormData]     = useState<FormData>({})
   const [mode, setMode]             = useState<Mode>('standard')
   const [result, setResult]         = useState<GenerateResult | null>(null)
+  const [outputState, setOutputState] = useState<{ selectedIndex: number; editedText: string } | null>(null)
   const [generating, setGenerating] = useState(false)
   const [error, setError]           = useState('')
   const [loadingForm, setLoadingForm] = useState(false)
+
+  const filledCount = form ? form.fields.filter(f => formData[f.name]?.trim()).length : 0
+  const requiredCount = form ? form.fields.filter(f => f.required).length : 0
+  const canGenerate = selected && form && filledCount >= Math.min(requiredCount, 2)
 
   useEffect(() => {
     api.templates.list().then(setTemplates)
@@ -82,7 +87,14 @@ export function GeneratorPage() {
     try {
       const res = await api.prompts.generate(selected, formData)
       setResult(res)
-      api.analytics.track('prompt_generated', selected, { qualityScore: res.qualityScore.overallScore })
+      setOutputState({ selectedIndex: 0, editedText: res.variations[0].text })
+      api.analytics.track('prompt_generated', selected, {
+        qualityScore: res.qualityScore.overallScore,
+        mode,
+        filledCount,
+        requiredCount,
+        promptLength: res.prompt.length,
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Generation failed')
     } finally {
@@ -90,9 +102,55 @@ export function GeneratorPage() {
     }
   }
 
-  const filledCount = form ? form.fields.filter(f => formData[f.name]?.trim()).length : 0
-  const requiredCount = form ? form.fields.filter(f => f.required).length : 0
-  const canGenerate = selected && form && filledCount >= Math.min(requiredCount, 2)
+  const levenshtein = (a: string, b: string) => {
+    if (a === b) return 0
+    const n = a.length, m = b.length
+    if (!n) return m
+    if (!m) return n
+    const dp = new Array(m + 1)
+    for (let j = 0; j <= m; j++) dp[j] = j
+    for (let i = 1; i <= n; i++) {
+      let prev = dp[0]
+      dp[0] = i
+      for (let j = 1; j <= m; j++) {
+        const tmp = dp[j]
+        const cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1
+        dp[j] = Math.min(dp[j] + 1, dp[j - 1] + 1, prev + cost)
+        prev = tmp
+      }
+    }
+    return dp[m]
+  }
+
+  const getEditDistance = () => {
+    if (!result || !outputState) return null
+    const original = result.variations[outputState.selectedIndex]?.text || result.variations[0].text
+    const edited = outputState.editedText || ''
+    const dist = levenshtein(original, edited)
+    const denom = Math.max(1, Math.max(original.length, edited.length))
+    return { edited: original !== edited, editDistance: dist / denom, originalLength: original.length, editedLength: edited.length }
+  }
+
+  const trackCopy = () => {
+    if (!selected || !result) return
+    const ed = getEditDistance()
+    api.analytics.track('prompt_copied', selected, {
+      variation: result.variations[outputState?.selectedIndex || 0]?.label,
+      qualityScore: result.qualityScore.overallScore,
+      ...(ed || {}),
+    })
+  }
+
+  const rate = (rating: 'good' | 'bad') => {
+    if (!selected || !result) return
+    const ed = getEditDistance()
+    api.analytics.track('prompt_rated', selected, {
+      rating,
+      variation: result.variations[outputState?.selectedIndex || 0]?.label,
+      qualityScore: result.qualityScore.overallScore,
+      ...(ed || {}),
+    })
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
@@ -214,7 +272,22 @@ export function GeneratorPage() {
             </div>
           )}
 
-          {result && <PromptDisplay result={result} />}
+          {result && (
+            <PromptDisplay
+              result={result}
+              onStateChange={setOutputState}
+              onCopy={trackCopy}
+            />
+          )}
+          {result && (
+            <div className="mt-4">
+              <p className="text-xs text-gray-500 mb-2">Was this prompt helpful?</p>
+              <div className="flex gap-3">
+                <Button variant="secondary" size="sm" onClick={() => rate('good')}>👍 Great prompt</Button>
+                <Button variant="secondary" size="sm" onClick={() => rate('bad')}>👎 Needs work</Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

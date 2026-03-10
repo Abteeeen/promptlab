@@ -7,6 +7,27 @@ import { QualityScoreMini } from '../components/QualityScore'
 
 // ── AI Prompt Generator ─────────────────────────────────────────────────────
 
+type PromptType =
+  | 'auto'
+  | 'research'
+  | 'writing'
+  | 'planning'
+  | 'agent'
+  | 'image'
+  | 'code'
+  | 'automation'
+
+const PROMPT_TYPE_CONFIG: Record<PromptType, { label: string; hint: string }> = {
+  auto:       { label: 'Auto',       hint: 'Let the AI detect the best structure automatically.' },
+  research:   { label: 'Research',   hint: 'Analyze, investigate, or summarize information and data.' },
+  writing:    { label: 'Writing',    hint: 'Blogs, emails, articles, landing pages, and more.' },
+  planning:   { label: 'Planning',   hint: 'Explore options, strategize, and plan projects or goals.' },
+  agent:      { label: 'Agent',      hint: 'Design custom GPTs, personas, or reusable assistants.' },
+  image:      { label: 'Image',      hint: 'Describe images, styles, and constraints for image models.' },
+  code:       { label: 'Code',       hint: 'Development, debugging, refactors, and code reviews.' },
+  automation: { label: 'Automation', hint: 'Workflows for tools like n8n, Zapier, and similar.' },
+}
+
 interface AIResult {
   prompt: string
   qualityScore: QualityScore
@@ -50,11 +71,23 @@ function AIGenerator() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [editedPrompt, setEditedPrompt] = useState('')
+  const [promptType, setPromptType] = useState<PromptType>('auto')
+  const [fileName, setFileName] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const resultRef = useRef<HTMLDivElement>(null)
 
   const generate = async (text?: string) => {
-    const req = (text || input).trim()
+    const base = (text || input).trim()
+    if (base.length < 5) return
+
+    const typeMeta = PROMPT_TYPE_CONFIG[promptType]
+    const typePrefix =
+      promptType === 'auto'
+        ? ''
+        : `\n\nPROMPT TYPE: ${typeMeta.label}\nINTENT: ${typeMeta.hint}\n`
+
+    const req = `${base}${typePrefix}`
     if (req.length < 5) return
     setLoading(true)
     setError('')
@@ -63,7 +96,11 @@ function AIGenerator() {
       const data = await api.ai.generate(req)
       setResult(data)
       setEditedPrompt(data.prompt)
-      api.analytics.track('ai_prompt_generated', undefined, { source: data.source })
+      api.analytics.track('ai_prompt_generated', undefined, {
+        source: data.source,
+        promptType,
+        hasFile: !!fileName,
+      })
       setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate. Try again.')
@@ -77,44 +114,113 @@ function AIGenerator() {
   }
 
   return (
-    <div className="w-full max-w-3xl mx-auto">
-      {/* Input area */}
-      <div
-        className="glass rounded-2xl overflow-hidden transition-all duration-300"
-        style={{
-          border: '1px solid rgba(139,92,246,0.3)',
-          boxShadow: loading ? '0 0 60px rgba(139,92,246,0.2)' : '0 0 40px rgba(139,92,246,0.1)',
-        }}
-      >
-        <textarea
-          ref={textareaRef}
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={handleKey}
-          placeholder="Describe what you need a prompt for... e.g. 'summarize this meeting in 3 bullet points'"
-          rows={3}
-          className="w-full bg-transparent px-5 pt-5 pb-3 text-white placeholder-gray-600 focus:outline-none text-sm leading-relaxed resize-none"
-        />
+    <div className="w-full max-w-5xl mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-[220px_minmax(0,1fr)] gap-4 items-start">
+        {/* Sidebar: prompt type + file */}
+        <aside className="glass rounded-2xl p-4 space-y-4 md:sticky md:top-28">
+          <div>
+            <p className="text-[11px] font-bold text-purple-300 uppercase tracking-widest mb-2">Prompt type</p>
+            <div className="flex flex-wrap gap-1.5">
+              {(Object.keys(PROMPT_TYPE_CONFIG) as PromptType[]).map(type => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setPromptType(type)}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all ${
+                    promptType === type
+                      ? 'bg-white/15 text-white border border-white/20'
+                      : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 border border-white/5'
+                  }`}
+                >
+                  {PROMPT_TYPE_CONFIG[type].label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] text-gray-500">
+              {PROMPT_TYPE_CONFIG[promptType].hint}
+            </p>
+          </div>
 
-        <div className="flex items-center justify-between px-4 pb-4 pt-1">
-          <span className="text-xs text-gray-600">
-            {input.length > 0 ? `${input.length} chars` : 'Ctrl+Enter to generate'}
-          </span>
-          <button
-            onClick={() => generate()}
-            disabled={loading || input.trim().length < 5}
-            className="inline-flex items-center gap-2 h-9 px-5 rounded-xl text-sm font-bold text-white bg-gradient-brand shadow-lg shadow-purple-500/25 hover:shadow-purple-500/45 hover:opacity-90 transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none"
+          <div>
+            <p className="text-[11px] font-bold text-purple-300 uppercase tracking-widest mb-2">Context file (optional)</p>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".txt,.md,.csv,.json,.log"
+              className="hidden"
+              onChange={async e => {
+                const file = e.target.files?.[0]
+                if (!file) {
+                  setFileName(null)
+                  return
+                }
+                setFileName(file.name)
+                try {
+                  const text = await file.text()
+                  const snippet = text.slice(0, 4000)
+                  setInput(prev => prev || `Use this file as context:\n\n${snippet}`)
+                  textareaRef.current?.focus()
+                } catch {
+                  setError('Could not read file contents. Try a smaller or plain-text file.')
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="w-full h-9 px-3 rounded-lg text-xs flex items-center justify-between bg-white/5 text-gray-200 hover:bg-white/10 border border-dashed border-white/20 transition-colors"
+            >
+              <span className="flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><path d="M7 9l5-5 5 5"/><path d="M12 4v12"/></svg>
+                {fileName ? <span className="truncate max-w-[120px]">{fileName}</span> : 'Upload context file'}
+              </span>
+              <span className="text-[10px] text-gray-500">.txt · .md · .csv · .json</span>
+            </button>
+          </div>
+
+          <div className="hidden md:block text-[10px] text-gray-600">
+            Tip: Start with your goal in plain English. We engineer the rest.
+          </div>
+        </aside>
+
+        {/* Input area */}
+        <div>
+          <div
+            className="glass rounded-2xl overflow-hidden transition-all duration-300"
+            style={{
+              border: '1px solid rgba(139,92,246,0.3)',
+              boxShadow: loading ? '0 0 60px rgba(139,92,246,0.2)' : '0 0 40px rgba(139,92,246,0.1)',
+            }}
           >
-            {loading
-              ? <><svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.2" /><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>Engineering...</>
-              : <><svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>Generate Prompt</>
-            }
-          </button>
-        </div>
-      </div>
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={handleKey}
+              placeholder="Describe what you need a prompt for... e.g. 'summarize this meeting in 3 bullet points'"
+              rows={4}
+              className="w-full bg-transparent px-5 pt-5 pb-3 text-white placeholder-gray-600 focus:outline-none text-sm leading-relaxed resize-none"
+            />
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 pb-4 pt-1">
+              <span className="text-xs text-gray-600">
+                {input.length > 0 ? `${input.length} chars` : 'Ctrl+Enter to generate'}
+              </span>
+              <button
+                onClick={() => generate()}
+                disabled={loading || input.trim().length < 5}
+                className="inline-flex items-center justify-center gap-2 h-9 px-5 rounded-xl text-sm font-bold text-white bg-gradient-brand shadow-lg shadow-purple-500/25 hover:shadow-purple-500/45 hover:opacity-90 transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none w-full sm:w-auto"
+              >
+                {loading
+                  ? <><svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.2" /><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>Engineering...</>
+                  : <><svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>Generate Prompt</>
+                }
+              </button>
+            </div>
+          </div>
 
       {/* Example chips */}
-      <div className="flex flex-wrap gap-2 mt-3 justify-center">
+      <div className="flex flex-wrap gap-2 mt-3 justify-center md:justify-start">
         {EXAMPLES.slice(0, 4).map(ex => (
           <button
             key={ex}
@@ -153,7 +259,7 @@ function AIGenerator() {
 
       {/* Result */}
       {result && !loading && (
-        <div ref={resultRef} className="mt-6 animate-slide-up">
+        <div ref={resultRef} className="mt-6 animate-slide-up md:col-span-2">
           <div className="glass rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(139,92,246,0.2)' }}>
             {/* Result header */}
             <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(139,92,246,0.06)' }}>
@@ -193,6 +299,7 @@ function AIGenerator() {
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }

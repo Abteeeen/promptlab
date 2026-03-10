@@ -36,6 +36,7 @@ router.post('/generate', (req, res) => {
 
 // POST /api/prompts/save — save a generated prompt to the user's library
 router.post('/save', requireAuth, async (req, res) => {
+  if (!process.env.DATABASE_URL) return res.status(503).json({ error: 'Database not configured — saving prompts is disabled.' });
   const { templateId, name, promptText, qualityScore, tags } = req.body;
 
   if (!promptText) {
@@ -57,6 +58,7 @@ router.post('/save', requireAuth, async (req, res) => {
 
 // GET /api/prompts — list current user's saved prompts
 router.get('/', requireAuth, async (req, res) => {
+  if (!process.env.DATABASE_URL) return res.status(503).json({ error: 'Database not configured — prompt library is disabled.' });
   const { sort = 'created_at', tag } = req.query;
 
   const allowed = ['created_at', 'quality_score', 'last_used_at'];
@@ -82,6 +84,7 @@ router.get('/', requireAuth, async (req, res) => {
 
 // DELETE /api/prompts/:id — delete a saved prompt
 router.delete('/:id', requireAuth, async (req, res) => {
+  if (!process.env.DATABASE_URL) return res.status(503).json({ error: 'Database not configured — prompt library is disabled.' });
   const result = await query(
     `DELETE FROM user_prompts WHERE id = $1 AND user_id = $2 RETURNING id`,
     [req.params.id, req.user.id]
@@ -94,6 +97,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
 
 // POST /api/prompts/:id/rate — rate a saved prompt (yes/no/okay)
 router.post('/:id/rate', requireAuth, async (req, res) => {
+  if (!process.env.DATABASE_URL) return res.status(503).json({ error: 'Database not configured — rating is disabled.' });
   const { rating } = req.body;
   if (!['yes', 'no', 'okay'].includes(rating)) {
     return res.status(400).json({ error: 'rating must be "yes", "no", or "okay".' });

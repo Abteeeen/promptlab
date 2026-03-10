@@ -1,5 +1,6 @@
 import React from 'react'
 import { Header } from './Header'
+import { FeedbackWidget } from '../FeedbackWidget'
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -12,6 +13,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </div>
       <Header />
       <main className="pt-20 relative z-10">{children}</main>
+      <FeedbackWidget />
     </div>
   )
 }

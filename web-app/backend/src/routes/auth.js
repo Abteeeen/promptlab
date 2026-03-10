@@ -18,6 +18,11 @@ const router = Router();
 router.post('/github', async (req, res) => {
   const { code } = req.body;
   if (!code) return res.status(400).json({ error: 'code is required.' });
+  if (!process.env.DATABASE_URL) return res.status(503).json({ error: 'Database not configured — authentication is currently disabled.' });
+  if (!process.env.GITHUB_CLIENT_ID || !process.env.GITHUB_CLIENT_SECRET) {
+    return res.status(500).json({ error: 'GitHub OAuth is not configured on the server.' });
+  }
+  if (!process.env.JWT_SECRET) return res.status(500).json({ error: 'JWT_SECRET is not configured on the server.' });
 
   try {
     // Exchange code for access token
@@ -70,6 +75,7 @@ router.post('/github', async (req, res) => {
 
 // GET /api/users/profile — return current authenticated user
 router.get('/profile', requireAuth, async (req, res) => {
+  if (!process.env.DATABASE_URL) return res.status(503).json({ error: 'Database not configured — profile is unavailable.' });
   const result = await query(
     `SELECT u.id, u.name, u.email, u.avatar_url, u.subscription, u.created_at,
             COUNT(p.id)::int AS prompts_count
