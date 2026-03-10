@@ -1,4 +1,4 @@
-vsimport React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../services/api'
 import type { Template, FormStructure, GenerateResult, FormData } from '../types'
