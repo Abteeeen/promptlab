@@ -51,6 +51,118 @@ ADVANCED PRINCIPLES:
 30. Role + Task + Format is the minimum viable prompt structure
 `;
 
+// ── Type-Specific Expert System Prompts ─────────────────────────────────────
+const TYPE_SYSTEM_PROMPTS = {
+  image: `You are an expert AI image prompt engineer specializing in Midjourney, DALL-E 3, and Stable Diffusion.
+
+For image prompts, NEVER use ROLE/TASK/REQUIREMENTS format. Instead create a single flowing descriptive prompt following this structure:
+[Main subject and action] + [Art style/medium] + [Lighting] + [Composition] + [Color palette] + [Mood/atmosphere] + [Technical quality tags]
+
+Always end with technical parameters:
+- For Midjourney: --ar 16:9 --q 2 --style raw
+- For DALL-E: mention "photorealistic" or "digital art"
+- Always include quality modifiers: 8k, hyperrealistic, highly detailed, professional photography
+
+Reference artistic styles: cinematography, concept art, oil painting, watercolor, photography style etc.
+
+Research-backed image prompt engineering:
+- Midjourney v6 prompt structure: descriptive natural language, not keyword lists
+- DALL-E 3 optimization: conversational, detailed descriptions work best
+- Stable Diffusion: balance positive description with negative prompts when needed
+- Lighting: golden hour, rim lighting, volumetric lighting, bokeh, depth of field, soft diffused, dramatic contrast
+- Style references: trending on artstation, by greg rutkowski, cinematic, editorial photography, Unreal Engine 5
+- Quality tags: 8k resolution, hyperrealistic, sharp focus, professional photography, masterpiece, award-winning`,
+
+  code: `You are a senior software engineer and code reviewer with 15+ years experience.
+
+For code prompts always include:
+- Exact programming language and version (e.g., "Python 3.11", "TypeScript 5.0")
+- Framework/library context (React, Django, FastAPI, etc.)
+- Specific function signature, class structure, or API endpoint needed
+- Example input → expected output with actual data
+- Edge cases to handle (null values, empty arrays, invalid input)
+- Error handling requirements (exceptions, error messages, fallback values)
+- Performance considerations (time/space complexity, optimization hints)
+- Security constraints if applicable (input validation, sanitization)
+
+Use technical precision — no vague language. Include code examples in backticks where helpful. Specify testing approach.`,
+
+  writing: `You are a senior content strategist and copywriter who has written for major publications.
+
+For writing/content prompts always include:
+- Specific target audience description (demographics, expertise level, pain points)
+- Tone and voice guidelines (formal/casual/technical/playful/authoritative)
+- Exact format (blog post, email, social thread, landing page, white paper)
+- Word count or length constraints (e.g., "500-700 words", "3-5 minute read")
+- SEO keywords to include naturally (if applicable)
+- Key points to cover (bullet list of must-include information)
+- What to avoid (jargon, passive voice, certain topics)
+- Call to action (what should reader do next?)
+- Brand voice examples (if available)`,
+
+  research: `You are a research director and analyst with expertise in academic and market research.
+
+For research prompts always include:
+- Clear research question or hypothesis
+- Scope boundaries (what to include AND explicitly exclude)
+- Source preferences (peer-reviewed, recent data, specific domains)
+- Output format (executive summary, detailed report, bullet points, comparison table)
+- Depth level (surface overview vs deep dive with methodology)
+- How to handle conflicting information or data gaps
+- Bias awareness instructions (acknowledge limitations, diverse perspectives)
+- Citation format if needed (APA, MLA, or informal)
+- Timeline of research (historical context vs current state)`,
+
+  planning: `You are a strategic planning consultant who has guided Fortune 500 companies.
+
+For planning prompts always include:
+- Clear goal definition with measurable success metrics
+- Constraints (budget, timeline, resources, legal/ethical limits)
+- Timeline and milestones (phases, deadlines, dependencies)
+- Resource requirements (team, budget, tools, external help)
+- Risk factors to consider and mitigation strategies
+- Prioritization framework (RICE, MoSCoW, impact/effort matrix)
+- What success looks like at each stage
+- Deliverable format (Gantt chart, OKRs, roadmap document)`,
+
+  agent: `You are an expert GPT/agent architect who designs custom AI assistants.
+
+For agent/GPT prompts always include:
+- Detailed persona and background (who they are, their expertise, speaking style)
+- Exact capabilities and expertise areas (what they CAN do)
+- Hard boundaries (what they must NEVER do or discuss)
+- Tone and communication style (formal friend, sarcastic expert, empathetic counselor)
+- Memory instructions (what to remember across conversations)
+- At least 2 example user/assistant exchanges showing the dynamic
+- Fallback behavior (what to do when confused or request is outside scope)
+- Knowledge cutoff awareness (what they don't know about)`,
+
+  automation: `You are an automation architect expert in n8n, Zapier, Make (Integromat), and similar tools.
+
+For automation prompts always include:
+- Trigger event description (what starts this workflow)
+- Step-by-step workflow with exact tool/node names
+- Conditional logic (if/then branches, filters)
+- Error handling at each step (what to do when something fails)
+- Data transformation steps (format conversion, field mapping)
+- Output format and destination (where results go)
+- Tools available (specific integrations: Slack, Airtable, Google Sheets, etc.)
+- Testing and debugging approach`,
+
+  auto: `You are the world's best prompt engineer with expertise across all domains.
+
+First detect the intent from the user's request:
+- If message contains: photo, image, picture, draw, generate image, artwork, illustration, portrait, landscape, design, visual, render, scene, concept art → use IMAGE prompt format
+- If message contains: code, function, script, debug, build, develop, program, algorithm, API, class, refactor → use CODE prompt format
+- If message contains: write, blog, article, email, content, copy, post → use WRITING prompt format
+- If message contains: research, analyze data, summarize, study, investigate → use RESEARCH prompt format
+- If message contains: plan, roadmap, strategy, organize, schedule → use PLANNING prompt format
+- If message contains: agent, GPT, persona, assistant, chatbot → use AGENT prompt format
+- If message contains: automate, workflow, n8n, zapier, integration → use AUTOMATION prompt format
+
+Apply the appropriate format for the detected intent. If unclear, use standard ROLE/TASK/REQUIREMENTS structure.`,
+};
+
 const FEW_SHOTS = {
   generic: [
     `User request: "help me with a task"
@@ -299,16 +411,54 @@ function detectDomain(userRequest) {
   return bestScore > 0 ? bestMatch : null;
 }
 
-// ── Build system prompt with research + template context ─────────────────────
-function buildSystemPrompt(detectedDomain) {
+// ── Detect prompt type from explicit mention or auto-detect ───────────────────
+function detectPromptType(userRequest) {
+  const lower = userRequest.toLowerCase();
+  
+  // Check for explicit PROMPT TYPE marker
+  const typeMatch = userRequest.match(/PROMPT TYPE:\s*(\w+)/i);
+  if (typeMatch) {
+    const explicitType = typeMatch[1].toLowerCase();
+    if (TYPE_SYSTEM_PROMPTS[explicitType]) {
+      return explicitType;
+    }
+  }
+  
+  // Auto-detect based on keywords
+  const IMAGE_KEYWORDS = ['photo', 'image', 'picture', 'draw', 'generate image', 'artwork', 'illustration', 'portrait', 'landscape', 'design', 'visual', 'render', 'scene', 'concept art'];
+  const CODE_KEYWORDS = ['code', 'function', 'script', 'debug', 'build', 'develop', 'program', 'algorithm', 'api', 'class', 'refactor'];
+  const WRITING_KEYWORDS = ['write', 'blog', 'article', 'email', 'content', 'copy', 'post'];
+  const RESEARCH_KEYWORDS = ['research', 'analyze data', 'summarize', 'study', 'investigate'];
+  const PLANNING_KEYWORDS = ['plan', 'roadmap', 'strategy', 'organize', 'schedule'];
+  const AGENT_KEYWORDS = ['agent', 'gpt', 'persona', 'assistant', 'chatbot'];
+  const AUTOMATION_KEYWORDS = ['automate', 'workflow', 'n8n', 'zapier', 'integration'];
+  
+  if (IMAGE_KEYWORDS.some(kw => lower.includes(kw))) return 'image';
+  if (CODE_KEYWORDS.some(kw => lower.includes(kw))) return 'code';
+  if (WRITING_KEYWORDS.some(kw => lower.includes(kw))) return 'writing';
+  if (RESEARCH_KEYWORDS.some(kw => lower.includes(kw))) return 'research';
+  if (PLANNING_KEYWORDS.some(kw => lower.includes(kw))) return 'planning';
+  if (AGENT_KEYWORDS.some(kw => lower.includes(kw))) return 'agent';
+  if (AUTOMATION_KEYWORDS.some(kw => lower.includes(kw))) return 'automation';
+  
+  return 'auto';
+}
+
+// ── Build system prompt with research + template context + type guidance ─────
+function buildSystemPrompt(detectedDomain, detectedType = 'auto') {
   const templates = loadTemplates();
   const template = detectedDomain
     ? templates.find(t => t.id === detectedDomain)
     : null;
 
+  // Get type-specific system prompt
+  const typePrompt = TYPE_SYSTEM_PROMPTS[detectedType] || TYPE_SYSTEM_PROMPTS.auto;
+
   let systemPrompt = `You are the world's best prompt engineer — a senior expert with 15+ years crafting prompts that get exceptional results from any AI model.
 
 When given a user's simple request, you transform it into a perfect, production-ready AI prompt. Your prompts consistently score 28-30/30 on quality metrics.
+
+${typePrompt}
 
 ${RESEARCH_PRINCIPLES}
 
@@ -321,12 +471,10 @@ PRIVATE PLANNING (do NOT output this section):
 
 STRICT OUTPUT RULES:
 - Output ONLY the prompt itself — no preamble, no "Here is your prompt:", no meta-commentary
-- Always include: role definition, specific task, detailed requirements, constraints, expected output format
-- Use labeled sections (ROLE, TASK, REQUIREMENTS, CONSTRAINTS, OUTPUT FORMAT)
 - Be specific and measurable — no vague words without defining them
 - Aim for 250-600 words depending on complexity
 - The result must be immediately copy-pasteable into ChatGPT, Claude, Gemini, or any AI tool
-- Apply ALL 30 principles above — your output must score 28+ on quality`;
+- Apply ALL principles above — your output must score 28+ on quality`;
 
   systemPrompt += buildFewShotSection(detectedDomain);
 
@@ -363,19 +511,24 @@ You are generating a prompt for the "${template.name}" domain (${template.domain
 export async function generateWithAI(userRequest) {
   const apiKey = process.env.GROQ_API_KEY;
 
-  // Detect domain from user request
+  // Detect domain and prompt type from user request
   const detectedDomain = detectDomain(userRequest);
+  const detectedType = detectPromptType(userRequest);
+  
   if (detectedDomain) {
     logger.debug('Domain detected', { domain: detectedDomain });
+  }
+  if (detectedType !== 'auto') {
+    logger.debug('Prompt type detected', { type: detectedType });
   }
 
   if (!apiKey) {
     logger.warn('GROQ_API_KEY not set — using fallback generation');
-    return fallbackGenerate(userRequest, detectedDomain);
+    return fallbackGenerate(userRequest, detectedDomain, detectedType);
   }
 
   try {
-    const systemPrompt = buildSystemPrompt(detectedDomain);
+    const systemPrompt = buildSystemPrompt(detectedDomain, detectedType);
 
     const res = await fetch(GROQ_URL, {
       method: 'POST',
@@ -407,6 +560,7 @@ export async function generateWithAI(userRequest) {
       model: MODEL,
       tokens: data.usage?.total_tokens,
       domain: detectedDomain || 'generic',
+      type: detectedType,
     });
 
     return {
@@ -414,16 +568,17 @@ export async function generateWithAI(userRequest) {
       model: MODEL,
       source: 'groq',
       domain: detectedDomain,
+      detectedType,
     };
 
   } catch (err) {
     logger.warn('AI generation failed, using fallback', { error: err.message });
-    return fallbackGenerate(userRequest, detectedDomain);
+    return fallbackGenerate(userRequest, detectedDomain, detectedType);
   }
 }
 
 // ── Fallback: research-backed offline generation ──────────────────────────────
-function fallbackGenerate(userRequest, detectedDomain) {
+function fallbackGenerate(userRequest, detectedDomain, detectedType = 'auto') {
   const templates = loadTemplates();
   const template = detectedDomain
     ? templates.find(t => t.id === detectedDomain)
@@ -442,6 +597,7 @@ function fallbackGenerate(userRequest, detectedDomain) {
       model: 'template',
       source: 'template',
       domain: detectedDomain,
+      detectedType,
     };
   }
 
@@ -482,6 +638,7 @@ Every claim must be accurate. Every recommendation must be actionable. Every sec
     model: 'fallback',
     source: 'template',
     domain: null,
+    detectedType,
   };
 }
 

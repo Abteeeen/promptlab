@@ -278,10 +278,10 @@ function AIGenerator() {
                   <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${showTypeDropdown ? 'rotate-180' : ''}`} />
                 </button>
 
-                {/* Dropdown Menu */}
+                {/* Dropdown Menu - Opens Downward */}
                 {showTypeDropdown && (
                   <div 
-                    className="absolute bottom-full left-0 mb-2 w-56 rounded-xl overflow-hidden z-50"
+                    className="absolute top-full left-0 mt-2 min-w-[220px] max-h-[280px] overflow-y-auto rounded-xl overflow-hidden z-[9999]"
                     style={{
                       background: 'rgba(15, 15, 25, 0.98)',
                       border: '1px solid rgba(139, 92, 246, 0.25)',
@@ -295,7 +295,7 @@ function AIGenerator() {
                           setPromptType(type)
                           setShowTypeDropdown(false)
                         }}
-                        className={`w-full px-4 py-3 text-left text-sm transition-colors flex items-center justify-between ${
+                        className={`w-full px-3 py-1.5 text-left text-[10px] transition-colors flex items-center justify-between ${
                           promptType === type 
                             ? 'bg-purple-500/15 text-white' 
                             : 'text-white/70 hover:bg-white/[0.05] hover:text-white'
@@ -303,7 +303,7 @@ function AIGenerator() {
                       >
                         <div>
                           <span className="font-medium">{PROMPT_TYPE_CONFIG[type].label}</span>
-                          <p className="text-[10px] text-white/40 mt-0.5">{PROMPT_TYPE_CONFIG[type].hint}</p>
+                          <p className="text-[9px] text-white/40 mt-0">{PROMPT_TYPE_CONFIG[type].hint}</p>
                         </div>
                         {promptType === type && (
                           <div className="w-1.5 h-1.5 rounded-full bg-purple-400" />
