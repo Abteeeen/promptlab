@@ -5,7 +5,7 @@
   "type": "module",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/models/migrate.js && node src/index.js",
+    "start": "node src/server.js",
     "dev": "nodemon src/index.js",
     "db:migrate": "node src/models/migrate.js"
   },
