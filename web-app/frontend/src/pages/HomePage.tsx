@@ -4,6 +4,7 @@ import { api } from '../services/api'
 import type { Template, QualityScore } from '../types'
 import { TemplateCard } from '../components/TemplateCard'
 import { QualityScoreMini } from '../components/QualityScore'
+import PromptHistory, { saveToHistory, type HistoryItem } from '../components/PromptHistory'
 
 // ── AI Prompt Generator ─────────────────────────────────────────────────────
 
@@ -34,6 +35,52 @@ interface AIResult {
   source: string
 }
 
+// ── Icons ───────────────────────────────────────────────────────────────────
+
+function SendIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+      <path d="M22 2L11 13" />
+      <path d="M22 2l-7 20-4-9-9-4 20-7z" />
+    </svg>
+  )
+}
+
+function PaperclipIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+    </svg>
+  )
+}
+
+function ChevronDownIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  )
+}
+
+function CopyIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  )
+}
+
+function CheckIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  )
+}
+
+// ── Components ───────────────────────────────────────────────────────────────
+
 function CopyBtn({ text, large }: { text: string; large?: boolean }) {
   const [copied, setCopied] = useState(false)
   const copy = async () => {
@@ -49,8 +96,8 @@ function CopyBtn({ text, large }: { text: string; large?: boolean }) {
         : 'h-8 px-3 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-white/8'}`}
     >
       {copied
-        ? <><svg className="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5" /></svg><span className={large ? 'text-emerald-400' : ''}>Copied!</span></>
-        : <><svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>Copy</>
+        ? <><CheckIcon className="w-3.5 h-3.5 text-emerald-400" /><span className={large ? 'text-emerald-400' : ''}>Copied!</span></>
+        : <><CopyIcon className="w-3.5 h-3.5" /><span>Copy</span></>
       }
     </button>
   )
@@ -58,10 +105,8 @@ function CopyBtn({ text, large }: { text: string; large?: boolean }) {
 
 const EXAMPLES = [
   'Explain quantum computing to a 10-year-old',
-  'Analyze customer churn data and find patterns',
   'Create a social media post for our product launch',
   'Debug this Python function that processes CSV files',
-  'Help me analyse a dataset',
   'Build a product roadmap for Q3',
 ]
 
@@ -72,10 +117,23 @@ function AIGenerator() {
   const [error, setError] = useState('')
   const [editedPrompt, setEditedPrompt] = useState('')
   const [promptType, setPromptType] = useState<PromptType>('auto')
+  const [showTypeDropdown, setShowTypeDropdown] = useState(false)
   const [fileName, setFileName] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const resultRef = useRef<HTMLDivElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowTypeDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const generate = async (text?: string) => {
     const base = (text || input).trim()
@@ -96,6 +154,16 @@ function AIGenerator() {
       const data = await api.ai.generate(req)
       setResult(data)
       setEditedPrompt(data.prompt)
+      
+      // Save to history
+      saveToHistory({
+        userRequest: base,
+        prompt: data.prompt,
+        qualityScore: data.qualityScore.overallScore,
+        domain: null,
+        source: data.source,
+      })
+      
       api.analytics.track('ai_prompt_generated', undefined, {
         source: data.source,
         promptType,
@@ -110,197 +178,270 @@ function AIGenerator() {
   }
 
   const handleKey = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) generate()
+    if (e.key === 'Enter' && !e.shiftKey && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      generate()
+    }
+  }
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) {
+      setFileName(null)
+      return
+    }
+    setFileName(file.name)
+    try {
+      const text = await file.text()
+      const snippet = text.slice(0, 4000)
+      setInput(prev => prev || `Use this file as context:\n\n${snippet}`)
+      textareaRef.current?.focus()
+    } catch {
+      setError('Could not read file contents. Try a smaller or plain-text file.')
+    }
+  }
+
+  const handleLoadFromHistory = (item: HistoryItem) => {
+    setInput(item.userRequest)
+    setResult({
+      prompt: item.prompt,
+      qualityScore: {
+        overallScore: item.qualityScore,
+        rating: item.qualityScore >= 26 ? 'Excellent' : item.qualityScore >= 20 ? 'Good' : item.qualityScore >= 15 ? 'Okay' : 'Needs Work',
+        suggestion: '',
+        breakdown: {},
+        dimensions: [],
+      },
+      source: item.source,
+    })
+    setEditedPrompt(item.prompt)
+    setTimeout(() => {
+      textareaRef.current?.focus()
+      resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 100)
   }
 
   return (
-    <div className="w-full max-w-5xl mx-auto">
-      <div className="grid grid-cols-1 md:grid-cols-[220px_minmax(0,1fr)] gap-4 items-start">
-        {/* Sidebar: prompt type + file */}
-        <aside className="glass rounded-2xl p-4 space-y-4 md:sticky md:top-28">
-          <div>
-            <p className="text-[11px] font-bold text-purple-300 uppercase tracking-widest mb-2">Prompt type</p>
-            <div className="flex flex-wrap gap-1.5">
-              {(Object.keys(PROMPT_TYPE_CONFIG) as PromptType[]).map(type => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => setPromptType(type)}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all ${promptType === type
-                      ? 'bg-white/15 text-white border border-white/20'
-                      : 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 border border-white/5'
-                    }`}
-                >
-                  {PROMPT_TYPE_CONFIG[type].label}
-                </button>
-              ))}
+    <>
+      <PromptHistory onLoad={handleLoadFromHistory} />
+      
+      <div className="w-full max-w-3xl mx-auto">
+        {/* Main Input Container */}
+        <div
+          className="relative rounded-3xl overflow-hidden transition-all duration-300"
+          style={{
+            background: 'rgba(255, 255, 255, 0.03)',
+            border: '1px solid rgba(139, 92, 246, 0.25)',
+            boxShadow: loading 
+              ? '0 0 80px rgba(139, 92, 246, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)' 
+              : '0 0 60px rgba(139, 92, 246, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+          }}
+        >
+          {/* Textarea */}
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={handleKey}
+            placeholder="Describe what you need a prompt for..."
+            rows={5}
+            className="w-full bg-transparent px-6 pt-6 pb-20 text-white placeholder:text-white/30 focus:outline-none text-base leading-relaxed resize-none"
+            style={{ minHeight: '140px' }}
+          />
+
+          {/* File attachment indicator */}
+          {fileName && (
+            <div className="absolute top-4 right-4 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] bg-white/10 text-white/70 border border-white/10">
+              <PaperclipIcon className="w-3 h-3" />
+              <span className="max-w-[120px] truncate">{fileName}</span>
+              <button 
+                onClick={() => setFileName(null)}
+                className="ml-1 text-white/40 hover:text-white/70"
+              >
+                ×
+              </button>
             </div>
-            <p className="mt-2 text-[11px] text-gray-500">
-              {PROMPT_TYPE_CONFIG[promptType].hint}
-            </p>
-          </div>
+          )}
 
-          <div>
-            <p className="text-[11px] font-bold text-purple-300 uppercase tracking-widest mb-2">Context file (optional)</p>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".txt,.md,.csv,.json,.log"
-              className="hidden"
-              onChange={async e => {
-                const file = e.target.files?.[0]
-                if (!file) {
-                  setFileName(null)
-                  return
-                }
-                setFileName(file.name)
-                try {
-                  const text = await file.text()
-                  const snippet = text.slice(0, 4000)
-                  setInput(prev => prev || `Use this file as context:\n\n${snippet}`)
-                  textareaRef.current?.focus()
-                } catch {
-                  setError('Could not read file contents. Try a smaller or plain-text file.')
-                }
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="w-full h-9 px-3 rounded-lg text-xs flex items-center justify-between bg-white/5 text-gray-200 hover:bg-white/10 border border-dashed border-white/20 transition-colors"
-            >
-              <span className="flex items-center gap-1.5">
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /><path d="M7 9l5-5 5 5" /><path d="M12 4v12" /></svg>
-                {fileName ? <span className="truncate max-w-[120px]">{fileName}</span> : 'Upload context file'}
-              </span>
-              <span className="text-[10px] text-gray-500">.txt · .md · .csv · .json</span>
-            </button>
-          </div>
+          {/* Bottom Bar */}
+          <div className="absolute bottom-0 left-0 right-0 h-14 px-4 flex items-center justify-between bg-gradient-to-t from-black/20 to-transparent">
+            {/* Left: Prompt Type & File Upload */}
+            <div className="flex items-center gap-2">
+              {/* Prompt Type Dropdown */}
+              <div className="relative" ref={dropdownRef}>
+                <button
+                  onClick={() => setShowTypeDropdown(!showTypeDropdown)}
+                  className="flex items-center gap-1.5 h-9 px-3 rounded-xl text-xs font-medium text-white/70 bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] hover:border-white/[0.2] transition-all"
+                >
+                  <span className="text-white/50">Type:</span>
+                  <span className="text-white/90">{PROMPT_TYPE_CONFIG[promptType].label}</span>
+                  <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${showTypeDropdown ? 'rotate-180' : ''}`} />
+                </button>
 
-          <div className="hidden md:block text-[10px] text-gray-600">
-            Tip: Start with your goal in plain English. We engineer the rest.
-          </div>
-        </aside>
+                {/* Dropdown Menu */}
+                {showTypeDropdown && (
+                  <div 
+                    className="absolute bottom-full left-0 mb-2 w-56 rounded-xl overflow-hidden z-50"
+                    style={{
+                      background: 'rgba(15, 15, 25, 0.98)',
+                      border: '1px solid rgba(139, 92, 246, 0.25)',
+                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+                    }}
+                  >
+                    {(Object.keys(PROMPT_TYPE_CONFIG) as PromptType[]).map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => {
+                          setPromptType(type)
+                          setShowTypeDropdown(false)
+                        }}
+                        className={`w-full px-4 py-3 text-left text-sm transition-colors flex items-center justify-between ${
+                          promptType === type 
+                            ? 'bg-purple-500/15 text-white' 
+                            : 'text-white/70 hover:bg-white/[0.05] hover:text-white'
+                        }`}
+                      >
+                        <div>
+                          <span className="font-medium">{PROMPT_TYPE_CONFIG[type].label}</span>
+                          <p className="text-[10px] text-white/40 mt-0.5">{PROMPT_TYPE_CONFIG[type].hint}</p>
+                        </div>
+                        {promptType === type && (
+                          <div className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
-        {/* Input area */}
-        <div>
-          <div
-            className="glass rounded-2xl overflow-hidden transition-all duration-300"
-            style={{
-              border: '1px solid rgba(139,92,246,0.3)',
-              boxShadow: loading ? '0 0 60px rgba(139,92,246,0.2)' : '0 0 40px rgba(139,92,246,0.1)',
-            }}
-          >
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleKey}
-              placeholder="Describe what you need a prompt for... e.g. 'summarize this meeting in 3 bullet points'"
-              rows={4}
-              className="w-full bg-transparent px-5 pt-5 pb-3 text-white placeholder-gray-600 focus:outline-none text-sm leading-relaxed resize-none"
-            />
+              {/* File Upload Button */}
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".txt,.md,.csv,.json,.log"
+                className="hidden"
+                onChange={handleFileUpload}
+              />
+              <button
+                onClick={() => fileRef.current?.click()}
+                className="flex items-center justify-center w-9 h-9 rounded-xl text-white/50 hover:text-white/80 bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] hover:border-white/[0.2] transition-all"
+                title="Upload context file"
+              >
+                <PaperclipIcon className="w-4 h-4" />
+              </button>
+            </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 pb-4 pt-1">
-              <span className="text-xs text-gray-600">
-                {input.length > 0 ? `${input.length} chars` : 'Ctrl+Enter to generate'}
+            {/* Right: Character count & Send Button */}
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-white/30 hidden sm:inline">
+                {input.length > 0 ? `${input.length} chars` : 'Ctrl+Enter'}
               </span>
               <button
                 onClick={() => generate()}
                 disabled={loading || input.trim().length < 5}
-                className="inline-flex items-center justify-center gap-2 h-9 px-5 rounded-xl text-sm font-bold text-white bg-gradient-brand shadow-lg shadow-purple-500/25 hover:shadow-purple-500/45 hover:opacity-90 transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none w-full sm:w-auto"
+                className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-violet-600 text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-105 transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none disabled:scale-100"
               >
-                {loading
-                  ? <><svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.2" /><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>Engineering...</>
-                  : <><svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>Generate Prompt</>
-                }
+                {loading ? (
+                  <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3" />
+                    <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                  </svg>
+                ) : (
+                  <SendIcon className="w-4 h-4" />
+                )}
               </button>
             </div>
           </div>
+        </div>
 
-          {/* Example chips */}
-          <div className="flex flex-wrap gap-2 mt-3 justify-center md:justify-start">
-            {EXAMPLES.slice(0, 4).map(ex => (
-              <button
-                key={ex}
-                onClick={() => { setInput(ex); generate(ex) }}
-                className="text-xs text-gray-500 hover:text-gray-300 px-3 py-1.5 rounded-lg hover:bg-white/5 transition-all border border-white/5 hover:border-white/10"
-              >
-                {ex.length > 40 ? ex.slice(0, 40) + '…' : ex}
-              </button>
+        {/* Example Chips - Centered Below */}
+        <div className="flex flex-wrap gap-2 mt-5 justify-center">
+          {EXAMPLES.map(ex => (
+            <button
+              key={ex}
+              onClick={() => { setInput(ex); generate(ex) }}
+              className="text-xs text-white/40 hover:text-white/70 px-4 py-2 rounded-full bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.06] hover:border-white/[0.15] transition-all"
+            >
+              {ex.length > 35 ? ex.slice(0, 35) + '…' : ex}
+            </button>
+          ))}
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="mt-6 px-4 py-3 rounded-xl text-sm text-red-400 animate-fade-in" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            {error}
+          </div>
+        )}
+
+        {/* Loading shimmer */}
+        {loading && (
+          <div className="mt-8 glass rounded-2xl p-6 space-y-4 animate-fade-in">
+            <div className="flex items-center gap-4 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-gradient-brand flex items-center justify-center animate-pulse-glow shrink-0">
+                <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a10 10 0 1 0 10 10" /><path d="M12 6v6l4 2" /></svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white">Senior prompt engineer at work...</p>
+                <p className="text-xs text-white/40">Crafting the perfect prompt for your request</p>
+              </div>
+            </div>
+            {[100, 85, 92, 70].map((w, i) => (
+              <div key={i} className="h-3 skeleton rounded-md" style={{ width: `${w}%` }} />
             ))}
           </div>
+        )}
 
-          {/* Error */}
-          {error && (
-            <div className="mt-4 px-4 py-3 rounded-xl text-sm text-red-400 animate-fade-in" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
-              {error}
-            </div>
-          )}
-
-          {/* Loading shimmer */}
-          {loading && (
-            <div className="mt-6 glass rounded-2xl p-5 space-y-3 animate-fade-in">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 rounded-xl bg-gradient-brand flex items-center justify-center animate-pulse-glow shrink-0">
-                  <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a10 10 0 1 0 10 10" /><path d="M12 6v6l4 2" /></svg>
+        {/* Result - Full Width */}
+        {result && !loading && (
+          <div ref={resultRef} className="mt-8 animate-slide-up">
+            <div 
+              className="rounded-2xl overflow-hidden"
+              style={{ 
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(139, 92, 246, 0.2)',
+              }}
+            >
+              {/* Result header */}
+              <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(139,92,246,0.06)' }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-sm font-semibold text-white">Your Perfect Prompt</span>
+                  <span className="text-xs text-white/40">
+                    {result.source === 'groq' ? '· AI-powered' : '· Template engine'}
+                  </span>
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-white">Senior prompt engineer at work...</p>
-                  <p className="text-xs text-gray-500">Crafting the perfect prompt for your request</p>
-                </div>
-              </div>
-              {[100, 85, 92, 70].map((w, i) => (
-                <div key={i} className="h-3 skeleton rounded-md" style={{ width: `${w}%` }} />
-              ))}
-            </div>
-          )}
-
-          {/* Result */}
-          {result && !loading && (
-            <div ref={resultRef} className="mt-6 animate-slide-up">
-              <div className="glass rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(139,92,246,0.2)' }}>
-                {/* Result header */}
-                <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(139,92,246,0.06)' }}>
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="text-xs font-semibold text-white">Your Perfect Prompt</span>
-                    <span className="text-xs text-gray-600">
-                      {result.source === 'groq' ? '· AI-powered' : '· Template engine'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <QualityScoreMini data={result.qualityScore} />
-                    <CopyBtn text={editedPrompt} large />
-                  </div>
-                </div>
-
-                {/* Editable prompt */}
-                <textarea
-                  value={editedPrompt}
-                  onChange={e => setEditedPrompt(e.target.value)}
-                  className="w-full bg-transparent px-5 py-4 text-sm text-gray-200 font-mono leading-relaxed focus:outline-none resize-none"
-                  style={{ minHeight: '240px' }}
-                  spellCheck={false}
-                />
-
-                {/* Footer hint */}
-                <div className="px-5 py-3 flex items-center justify-between" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                  <p className="text-xs text-gray-600">You can edit this prompt directly above before copying.</p>
-                  <Link
-                    to="/generate"
-                    className="text-xs text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1"
-                  >
-                    Use a template instead
-                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
-                  </Link>
+                <div className="flex items-center gap-3">
+                  <QualityScoreMini data={result.qualityScore} />
+                  <CopyBtn text={editedPrompt} large />
                 </div>
               </div>
+
+              {/* Editable prompt */}
+              <textarea
+                value={editedPrompt}
+                onChange={e => setEditedPrompt(e.target.value)}
+                className="w-full bg-transparent px-5 py-5 text-sm text-white/90 font-mono leading-relaxed focus:outline-none resize-none"
+                style={{ minHeight: '280px' }}
+                spellCheck={false}
+              />
+
+              {/* Footer hint */}
+              <div className="px-5 py-4 flex items-center justify-between" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                <p className="text-xs text-white/40">You can edit this prompt directly above before copying.</p>
+                <Link
+                  to="/generate"
+                  className="text-xs text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1"
+                >
+                  Use a template instead
+                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+                </Link>
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
-    </div>
+    </>
   )
 }
 
@@ -398,21 +539,23 @@ export function HomePage() {
   return (
     <div className="min-h-screen">
       {/* Hero */}
-      <section className="px-6 pt-16 pb-16 text-center">
-        {/* Badge */}
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-8 animate-fade-in" style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)' }}>
+      <section className="px-6 pt-20 pb-12 text-center">
+        {/* Badge - Much smaller */}
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-6 animate-fade-in" style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)' }}>
           <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
-          <span className="text-xs font-semibold text-purple-300 tracking-wide">⚡ Your personal AI prompt engineer — free</span>
+          <span className="text-[11px] font-medium text-purple-300 tracking-wide">Free AI prompt engineer</span>
         </div>
 
-        {/* Headline */}
-        <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight leading-none mb-5 animate-slide-up">
+        {/* Headline - Bigger, bolder, centered */}
+        <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tight leading-[0.9] mb-4 animate-slide-up">
           <span className="text-white">Any idea.</span>
           <br />
           <span className="gradient-text">Perfect prompt.</span>
         </h1>
-        <p className="text-gray-400 text-base sm:text-lg max-w-lg mx-auto mb-12 animate-slide-up text-balance" style={{ animationDelay: '0.1s' }}>
-          Describe what you need in plain English. Our AI acts as a senior prompt engineer and crafts the ultimate prompt for you instantly.
+        
+        {/* Subtitle */}
+        <p className="text-sm sm:text-base text-white/50 max-w-md mx-auto mb-16 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+          Your cheat code to AI that just works
         </p>
 
         {/* Generator */}
