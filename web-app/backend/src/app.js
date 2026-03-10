@@ -13,6 +13,7 @@ import analyticsRoutes from './routes/analytics.js';
 import aiRoutes from './routes/ai.js';
 
 const app = express();
+app.set('trust proxy', 1);
 
 // ── CORS ────────────────────────────────────────────────────────────────────
 app.use(cors({
