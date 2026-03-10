@@ -28,30 +28,30 @@ function CopyBtn({ text, large }: { text: string; large?: boolean }) {
         : 'h-8 px-3 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-white/8'}`}
     >
       {copied
-        ? <><svg className="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg><span className={large ? 'text-emerald-400' : ''}>Copied!</span></>
-        : <><svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy</>
+        ? <><svg className="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5" /></svg><span className={large ? 'text-emerald-400' : ''}>Copied!</span></>
+        : <><svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>Copy</>
       }
     </button>
   )
 }
 
 const EXAMPLES = [
-  'Write a cold email to a startup founder about our SaaS tool',
+  'Explain quantum computing to a 10-year-old',
   'Analyze customer churn data and find patterns',
   'Create a social media post for our product launch',
   'Debug this Python function that processes CSV files',
-  'Explain quantum computing to a 10-year-old',
+  'Help me analyse a dataset',
   'Build a product roadmap for Q3',
 ]
 
 function AIGenerator() {
-  const [input, setInput]       = useState('')
-  const [result, setResult]     = useState<AIResult | null>(null)
-  const [loading, setLoading]   = useState(false)
-  const [error, setError]       = useState('')
+  const [input, setInput] = useState('')
+  const [result, setResult] = useState<AIResult | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const [editedPrompt, setEditedPrompt] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const resultRef   = useRef<HTMLDivElement>(null)
+  const resultRef = useRef<HTMLDivElement>(null)
 
   const generate = async (text?: string) => {
     const req = (text || input).trim()
@@ -91,7 +91,7 @@ function AIGenerator() {
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKey}
-          placeholder="Describe what you need a prompt for... e.g. 'cold email to startup founders about my SaaS'"
+          placeholder="Describe what you need a prompt for... e.g. 'summarize this meeting in 3 bullet points'"
           rows={3}
           className="w-full bg-transparent px-5 pt-5 pb-3 text-white placeholder-gray-600 focus:outline-none text-sm leading-relaxed resize-none"
         />
@@ -106,8 +106,8 @@ function AIGenerator() {
             className="inline-flex items-center gap-2 h-9 px-5 rounded-xl text-sm font-bold text-white bg-gradient-brand shadow-lg shadow-purple-500/25 hover:shadow-purple-500/45 hover:opacity-90 transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none"
           >
             {loading
-              ? <><svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.2"/><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg>Engineering...</>
-              : <><svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>Generate Prompt</>
+              ? <><svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.2" /><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>Engineering...</>
+              : <><svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>Generate Prompt</>
             }
           </button>
         </div>
@@ -138,7 +138,7 @@ function AIGenerator() {
         <div className="mt-6 glass rounded-2xl p-5 space-y-3 animate-fade-in">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-8 h-8 rounded-xl bg-gradient-brand flex items-center justify-center animate-pulse-glow shrink-0">
-              <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></svg>
+              <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a10 10 0 1 0 10 10" /><path d="M12 6v6l4 2" /></svg>
             </div>
             <div>
               <p className="text-sm font-semibold text-white">Senior prompt engineer at work...</p>
@@ -187,7 +187,7 @@ function AIGenerator() {
                 className="text-xs text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1"
               >
                 Use a template instead
-                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
               </Link>
             </div>
           </div>
@@ -204,7 +204,7 @@ const HOW_TO = [
     step: '01',
     icon: '✍️',
     title: 'Describe what you need',
-    desc: 'Type anything — a task, a goal, or a problem. No special format needed. Plain English is perfect.',
+    desc: 'Type anything a task, a goal, or a problem. No special format needed. Plain English is perfect.',
     example: '"Cold email to a startup CTO"',
   },
   {
@@ -218,7 +218,7 @@ const HOW_TO = [
     step: '03',
     icon: '🚀',
     title: 'Copy & get better results',
-    desc: 'Paste it into ChatGPT, Claude, Gemini — any AI tool. Get dramatically better responses every time.',
+    desc: 'Paste it into ChatGPT, Claude, Gemini any AI tool. Get dramatically better responses every time.',
     example: 'Quality score: 28–30 / 30',
   },
 ]
@@ -267,7 +267,7 @@ function TemplatesPreview({ templates }: { templates: Template[] }) {
         </div>
         <Link to="/templates" className="text-sm text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1 shrink-0">
           Browse all 10
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
         </Link>
       </div>
 
@@ -288,7 +288,7 @@ export function HomePage() {
   const [templates, setTemplates] = useState<Template[]>([])
 
   useEffect(() => {
-    api.templates.list().then(setTemplates).catch(() => {})
+    api.templates.list().then(setTemplates).catch(() => { })
     api.analytics.track('page_view', undefined, { page: 'home' })
   }, [])
 
@@ -299,7 +299,7 @@ export function HomePage() {
         {/* Badge */}
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-8 animate-fade-in" style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)' }}>
           <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
-          <span className="text-xs font-semibold text-purple-300 tracking-wide">AI Senior Prompt Engineer — free, instant</span>
+          <span className="text-xs font-semibold text-purple-300 tracking-wide"> Your personal AI prompt engineer</span>
         </div>
 
         {/* Headline */}
@@ -309,7 +309,7 @@ export function HomePage() {
           <span className="gradient-text">Perfect prompt.</span>
         </h1>
         <p className="text-gray-400 text-base sm:text-lg max-w-lg mx-auto mb-12 animate-slide-up text-balance" style={{ animationDelay: '0.1s' }}>
-          Describe what you need in plain English. Our AI acts as a senior prompt engineer and crafts the ultimate prompt for you — instantly.
+          Describe what you need in plain English. Our AI acts as a senior prompt engineer and crafts the ultimate prompt for you instantly.
         </p>
 
         {/* Generator */}
