@@ -14,9 +14,11 @@ export function Header() {
     <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4" style={{ background: 'rgba(5, 5, 8, 0.8)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 1px 40px rgba(139,92,246,0.08)' }}>
       {/* Logo */}
       <Link to="/" className="flex items-center gap-2.5 group">
-        <div className="w-8 h-8 rounded-xl bg-gradient-brand flex items-center justify-center text-sm font-black text-white shadow-lg shadow-purple-500/30 group-hover:shadow-purple-500/50 transition-shadow">
-          P
-        </div>
+        <img 
+          src="/logo.png" 
+          alt="Prompt Engine" 
+          className="w-8 h-8 rounded-xl object-cover shadow-lg shadow-purple-500/30 group-hover:shadow-purple-500/50 transition-shadow"
+        />
         <span className="text-sm font-bold text-white/90 tracking-tight">Prompt Engine</span>
       </Link>
 
