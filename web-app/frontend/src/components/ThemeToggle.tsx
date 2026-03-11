@@ -20,14 +20,29 @@ export function ThemeToggle({ variant = 'desktop' }: { variant?: 'mobile' | 'des
     // Cycle: default -> dark -> light -> default
     const newTheme: Theme = theme === 'default' ? 'dark' : theme === 'dark' ? 'light' : 'default'
     
-    // Trigger Dr. Strange animation when going back to Default
+    setIsTransitioning(true)
+    let animationClass = ''
+    let timeout = 0
+
     if (newTheme === 'default') {
-      setIsTransitioning(true)
-      document.body.classList.add('theme-transition-active')
+      animationClass = 'theme-transition-active'
+      timeout = 1200
+    } else if (newTheme === 'dark') {
+      animationClass = 'theme-batman-active'
+      timeout = 400
+    } else if (newTheme === 'light') {
+      animationClass = 'theme-wakeup-active'
+      timeout = 400
+    }
+
+    if (animationClass) {
+      document.body.classList.add(animationClass)
       setTimeout(() => {
         setIsTransitioning(false)
-        document.body.classList.remove('theme-transition-active')
-      }, 1200) // Match the 1.2s CSS animation
+        document.body.classList.remove(animationClass)
+      }, timeout)
+    } else {
+      setIsTransitioning(false)
     }
 
     setTheme(newTheme)
