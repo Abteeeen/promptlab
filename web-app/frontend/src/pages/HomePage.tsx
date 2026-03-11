@@ -339,7 +339,7 @@ function AIGenerator() {
               <button
                 onClick={() => generate()}
                 disabled={loading || input.trim().length < 5}
-                className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-violet-600 text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-105 transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none disabled:scale-100"
+                className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-violet-600 text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/60 hover:scale-[1.02] active:scale-95 transition-all duration-200 disabled:opacity-40 disabled:pointer-events-none disabled:scale-100"
               >
                 {loading ? (
                   <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
@@ -473,7 +473,7 @@ const HOW_TO = [
 
 function HowToUse() {
   return (
-    <section className="max-w-4xl mx-auto px-6 py-20">
+    <section className="max-w-4xl mx-auto px-6 py-32">
       <div className="text-center mb-12">
         <p className="text-xs font-bold text-purple-400 uppercase tracking-widest mb-3">How it works</p>
         <h2 className="text-2xl sm:text-3xl font-black text-white">Three steps to a perfect prompt</h2>
@@ -503,7 +503,7 @@ function HowToUse() {
 function TemplatesPreview({ templates }: { templates: Template[] }) {
   if (!templates.length) return null
   return (
-    <section className="max-w-6xl mx-auto px-6 pb-24">
+    <section className="max-w-6xl mx-auto px-6 pt-8 pb-32">
       <div className="flex items-center justify-between mb-6">
         <div>
           <p className="text-xs font-bold text-purple-400 uppercase tracking-widest mb-1">Domain templates</p>
@@ -539,7 +539,39 @@ export function HomePage() {
   return (
     <div className="min-h-screen">
       {/* Hero */}
-      <section className="px-6 pt-20 pb-12 text-center">
+      <section className="relative px-6 pt-20 pb-16 text-center overflow-hidden">
+        {/* Ambient glow orbs */}
+        <div className="absolute pointer-events-none inset-0 overflow-hidden">
+          <div style={{
+            position: 'absolute',
+            top: '-10%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: '800px',
+            height: '400px',
+            background: 'radial-gradient(ellipse, rgba(139,92,246,0.25) 0%, transparent 70%)',
+            filter: 'blur(40px)',
+          }} />
+          <div style={{
+            position: 'absolute',
+            top: '30%',
+            left: '20%',
+            width: '300px',
+            height: '300px',
+            background: 'radial-gradient(ellipse, rgba(59,130,246,0.15) 0%, transparent 70%)',
+            filter: 'blur(60px)',
+          }} />
+          <div style={{
+            position: 'absolute',
+            top: '20%',
+            right: '20%',
+            width: '250px',
+            height: '250px',
+            background: 'radial-gradient(ellipse, rgba(168,85,247,0.15) 0%, transparent 70%)',
+            filter: 'blur(50px)',
+          }} />
+        </div>
+
         {/* Badge - Much smaller */}
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-6 animate-fade-in" style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)' }}>
           <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
@@ -547,7 +579,7 @@ export function HomePage() {
         </div>
 
         {/* Headline - Bigger, bolder, centered */}
-        <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tight leading-[0.9] mb-4 animate-slide-up">
+        <h1 className="text-5xl sm:text-7xl lg:text-8xl font-black tracking-tighter leading-[0.9] mb-6 animate-slide-up">
           <span className="text-white">Any idea.</span>
           <br />
           <span className="gradient-text">Perfect prompt.</span>
