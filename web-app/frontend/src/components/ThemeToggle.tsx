@@ -29,10 +29,10 @@ export function ThemeToggle({ variant = 'desktop' }: { variant?: 'mobile' | 'des
       timeout = 1200
     } else if (newTheme === 'dark') {
       animationClass = 'theme-batman-active'
-      timeout = 3400
+      timeout = 400
     } else if (newTheme === 'light') {
       animationClass = 'theme-wakeup-active'
-      timeout = 1400
+      timeout = 400
     }
 
     if (animationClass) {

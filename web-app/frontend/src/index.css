@@ -274,7 +274,7 @@
 
   /* Batman Dark Mode Animation (Split Second) */
   .theme-batman-active {
-    animation: batman-shake 3.4s ease-in-out forwards;
+    animation: batman-shake 0.4s ease-in-out forwards;
     position: relative;
     overflow: hidden;
   }
@@ -285,7 +285,7 @@
     z-index: 9999;
     pointer-events: none;
     background: #000;
-    animation: bat-swoop 3.4s ease-in-out forwards;
+    animation: bat-swoop 0.4s ease-in-out forwards;
   }
 
   /* Wake Up Light Mode Animation (Split Second) */
@@ -300,7 +300,7 @@
     z-index: 9999;
     pointer-events: none;
     background: #FFF8F0;
-    animation: eye-open 1.4s ease-in-out forwards;
+    animation: eye-open 0.4s ease-in-out forwards;
   }
 }
 
