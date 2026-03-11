@@ -1,11 +1,10 @@
-import React, { useEffect, useState, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import React, { useState, useEffect, useRef } from 'react'
 import { api } from '../services/api'
 import type { Template, QualityScore } from '../types'
 import { TemplateCard } from '../components/TemplateCard'
+import { Link } from 'react-router-dom'
+import PromptHistory, { HistoryItem, saveToHistory } from '../components/PromptHistory'
 import { QualityScoreMini } from '../components/QualityScore'
-import PromptHistory, { saveToHistory, type HistoryItem } from '../components/PromptHistory'
-
 // ── AI Prompt Generator ─────────────────────────────────────────────────────
 
 type PromptType =
@@ -154,7 +153,7 @@ function AIGenerator() {
       const data = await api.ai.generate(req)
       setResult(data)
       setEditedPrompt(data.prompt)
-      
+
       // Save to history
       saveToHistory({
         userRequest: base,
@@ -163,7 +162,7 @@ function AIGenerator() {
         domain: null,
         source: data.source,
       })
-      
+
       api.analytics.track('ai_prompt_generated', undefined, {
         source: data.source,
         promptType,
@@ -224,7 +223,7 @@ function AIGenerator() {
   return (
     <>
       <PromptHistory onLoad={handleLoadFromHistory} />
-      
+
       <div className="w-full max-w-3xl mx-auto">
         {/* Main Input Container */}
         <div
@@ -232,8 +231,8 @@ function AIGenerator() {
           style={{
             background: 'rgba(255, 255, 255, 0.03)',
             border: '1px solid rgba(139, 92, 246, 0.25)',
-            boxShadow: loading 
-              ? '0 0 80px rgba(139, 92, 246, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)' 
+            boxShadow: loading
+              ? '0 0 80px rgba(139, 92, 246, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
               : '0 0 60px rgba(139, 92, 246, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
           }}
         >
@@ -254,7 +253,7 @@ function AIGenerator() {
             <div className="absolute top-4 right-4 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] bg-white/10 text-white/70 border border-white/10">
               <PaperclipIcon className="w-3 h-3" />
               <span className="max-w-[120px] truncate">{fileName}</span>
-              <button 
+              <button
                 onClick={() => setFileName(null)}
                 className="ml-1 text-white/40 hover:text-white/70"
               >
@@ -280,7 +279,7 @@ function AIGenerator() {
 
                 {/* Dropdown Menu - Opens Downward */}
                 {showTypeDropdown && (
-                  <div 
+                  <div
                     className="absolute top-full left-0 mt-2 min-w-[220px] max-h-[280px] overflow-y-auto rounded-xl overflow-hidden z-[9999]"
                     style={{
                       background: 'rgba(15, 15, 25, 0.98)',
@@ -295,11 +294,10 @@ function AIGenerator() {
                           setPromptType(type)
                           setShowTypeDropdown(false)
                         }}
-                        className={`w-full px-3 py-1.5 text-left text-[10px] transition-colors flex items-center justify-between ${
-                          promptType === type 
-                            ? 'bg-purple-500/15 text-white' 
+                        className={`w-full px-3 py-1.5 text-left text-[10px] transition-colors flex items-center justify-between ${promptType === type
+                            ? 'bg-purple-500/15 text-white'
                             : 'text-white/70 hover:bg-white/[0.05] hover:text-white'
-                        }`}
+                          }`}
                       >
                         <div>
                           <span className="font-medium">{PROMPT_TYPE_CONFIG[type].label}</span>
@@ -395,9 +393,9 @@ function AIGenerator() {
         {/* Result - Full Width */}
         {result && !loading && (
           <div ref={resultRef} className="mt-8 animate-slide-up">
-            <div 
+            <div
               className="rounded-2xl overflow-hidden"
-              style={{ 
+              style={{
                 background: 'rgba(255, 255, 255, 0.03)',
                 border: '1px solid rgba(139, 92, 246, 0.2)',
               }}
@@ -584,7 +582,7 @@ export function HomePage() {
           <br />
           <span className="gradient-text">Perfect prompt.</span>
         </h1>
-        
+
         {/* Subtitle */}
         <p className="text-sm sm:text-base text-white/50 max-w-md mx-auto mb-16 animate-slide-up" style={{ animationDelay: '0.1s' }}>
           Your cheat code to AI that just works
