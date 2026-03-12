@@ -703,14 +703,15 @@ Format: [style], [subject], [setting], [mood], [technical details]
 Example: Warm cinematic photo of a happy family of 4 sitting on a picnic blanket in a sunny park, golden hour lighting, shot on 85mm lens, shallow depth of field, authentic candid moment`;
 
 // ── AI API call helper (Groq & OpenRouter) ─────────────────────────────────────────────────────
-async function callAI(userRequest, systemPrompt, provider = 'groq', modelOverride = null) {
+// systemPrompt = persona/role/rules for this agent
+// userContent = the actual request message sent to this agent
+async function callAI(systemPrompt, userContent, provider = 'groq', modelOverride = null) {
   let url = GROQ_URL;
   let apiKey = process.env.GROQ_API_KEY;
   let model = modelOverride || MODEL;
 
   if (provider === 'openrouter') {
     url = 'https://openrouter.ai/api/v1/chat/completions';
-    // User requested explicitly to use this specific free key directly inside the code for Agent 1 and 2
     apiKey = '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';
   }
 
@@ -725,23 +726,13 @@ async function callAI(userRequest, systemPrompt, provider = 'groq', modelOverrid
       })
     },
     body: JSON.stringify({
-      model: model,
+      model,
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Transform this into a perfect prompt.
-
-Apply these specific techniques:
-1. Define the AUDIENCE explicitly (who will use this output?)
-2. Add CONFIDENCE LEVEL instructions if factual claims are involved
-3. Set specific CONSTRAINTS (budget, length, format, tools)
-4. Use COSTAR or RISEN framework structure
-5. Include at least ONE edge case or negative example
-6. End with a SELF-REVIEW instruction
-
-User request: ${userRequest}` },
+        { role: 'user', content: userContent },
       ],
-      temperature: 0.7,
-      max_tokens: 1200,
+      temperature: 0.75,
+      max_tokens: 1500,
     }),
   });
 
@@ -777,37 +768,58 @@ export async function generateWithAI(userRequest) {
   }
 
   try {
-    // Phase 1: Context Gathering (Web Search + Supabase RAG)
+    // Phase 1: Context Gathering (Web Search + Supabase RAG) — runs in parallel
     const [webContext, ragContext] = await Promise.all([
       tavilySearch(userRequest),
       getSupabaseContext(userRequest)
     ]);
 
+    // Build enriched request with live context
     let augmentedRequest = userRequest;
-    if (webContext) augmentedRequest += `\n\nLIVE SEARCH CONTEXT:\n${webContext}`;
+    if (webContext) augmentedRequest += `\n\nLIVE WEB CONTEXT (use this to ground your analysis in current facts):\n${webContext}`;
 
-    // Agent A: Researcher (Analyzes idea)
-    const researcherPrompt = `You are a Strategic Researcher. Analyze this request and provide a strict 3-point strategy for writing an AI prompt for it. Include target audience, constraints, and format. Only output the strategy.`;
-    const researcherData = await callAI(augmentedRequest, researcherPrompt, 'openrouter', 'meta-llama/llama-3.3-70b-instruct:free');
-    const strategy = researcherData.choices?.[0]?.message?.content?.trim();
+    // ─── Agent A: RESEARCHER ──────────────────────────────────────────────────
+    // Purpose: Analyze the idea and return a strategic plan only (no prompt yet)
+    const researcherSystemPrompt = `You are a Strategic Prompt Engineer Researcher.
+Your ONLY job is to analyze a user's request and write a concise 3-point strategy for crafting the perfect AI prompt for it.
+Outputs:
+1. Target Audience (who will use this prompt?)
+2. Key Constraints (what must the prompt include or avoid?)
+3. Best format/structure for the final prompt (ROLE/TASK/REQUIREMENTS, or COSTAR, etc.)
+Do NOT write the prompt itself. Output ONLY the 3-point strategy, nothing else.`;
 
-    // Agent B: Drafter
-    const systemPrompt = isImageRequest 
-      ? IMAGE_SYSTEM_PROMPT 
+    const researcherInput = `Analyze this user request and return a 3-point strategy:\n\n"${augmentedRequest}"`;
+    const researcherData = await callAI(researcherSystemPrompt, researcherInput, 'openrouter', 'meta-llama/llama-3.3-70b-instruct:free');
+    const strategy = researcherData.choices?.[0]?.message?.content?.trim() || '';
+
+    // ─── Agent B: DRAFTER ────────────────────────────────────────────────────
+    // Purpose: Write the full expert prompt, powered by: user request + strategy + RAG + system rules
+    const drafterSystemPrompt = isImageRequest
+      ? IMAGE_SYSTEM_PROMPT
       : buildSystemPrompt(detectedDomain, detectedType);
 
-    let drafterInput = `USER REQUEST:\n${augmentedRequest}\n\nRESEARCHER STRATEGY:\n${strategy}`;
-    if (ragContext) drafterInput += `\n\nHIGHLY SUCCESSFUL RAG EXAMPLES:\n${ragContext}`;
+    let drafterUserContent = `Write a complete, expert-level AI prompt for the following user request.
 
-    const draftData = await callAI(drafterInput, systemPrompt, 'openrouter', 'google/gemini-2.0-flash-exp:free');
+USER REQUEST: "${userRequest}"\n\nRESEARCHER STRATEGY:\n${strategy}`;
+    if (ragContext) drafterUserContent += `\n\nHIGHLY SUCCESSFUL EXAMPLE PROMPTS (use these as structural inspiration):\n${ragContext}`;
+    drafterUserContent += `\n\nAPPLY THESE TECHNIQUES:\n1. Define the AUDIENCE explicitly\n2. Add CONFIDENCE LEVEL instructions if factual claims are involved\n3. Set specific CONSTRAINTS (budget, timeline, length, format)\n4. Use COSTAR or RISEN framework\n5. Include at least ONE edge case or negative example\n6. End with a SELF-REVIEW instruction\n\nNow write the complete, final AI prompt:`;
+
+    const draftData = await callAI(drafterSystemPrompt, drafterUserContent, 'openrouter', 'google/gemini-2.0-flash-exp:free');
     let draftText = draftData.choices?.[0]?.message?.content?.trim();
-    if (!draftText) throw new Error('Empty draft response from AI');
+    if (!draftText) throw new Error('Empty draft response from Drafter Agent');
 
-    // Agent C: Critic (Grades and Refines)
-    const criticPrompt = `You are an Expert Prompt Critic. Review this draft AI prompt. If it scores 9/10 or 10/10 for specificity, constraints, and format, return EXACTLY the same prompt. If < 9/10, rewrite it to be bulletproof. OUTPUT ONLY THE FINAL PROMPT, no preamble.`;
-    const criticData = await callAI(draftText, criticPrompt, 'groq', MODEL);
+    // ─── Agent C: CRITIC ────────────────────────────────────────────────────
+    // Purpose: Quality-review the draft and rewrite it if score < 9/10
+    const criticSystemPrompt = `You are an expert AI Prompt Critic and Quality Reviewer.
+Your job: Review the draft prompt below and score it on: Specificity, Audience Clarity, Constraints, Format, and Edge Case Coverage.
+If the score is 9/10 or 10/10, return the prompt EXACTLY as-is.
+If the score is below 9/10, rewrite the prompt to fix its weaknesses and return only the final improved version.
+IMPORTANT: Output ONLY the final prompt text. No preamble, no scores, no explanations.`;
+
+    const criticInput = `Review and improve this AI prompt if needed:\n\n${draftText}`;
+    const criticData = await callAI(criticSystemPrompt, criticInput, 'groq', MODEL);
     let text = criticData.choices?.[0]?.message?.content?.trim();
-    if (!text || text.length < 50) text = draftText; // Fallback if critic fails
+    if (!text || text.length < 80) text = draftText; // Fallback if critic returns garbage
 
     logger.debug('AI prompt generated by 3-agent pipeline', {
       model: MODEL,
