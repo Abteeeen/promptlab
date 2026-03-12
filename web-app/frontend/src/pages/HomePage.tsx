@@ -288,7 +288,7 @@ function AIGenerator() {
       <div className="w-full max-w-3xl mx-auto">
         {/* Main Input Container */}
         <div
-          className="relative rounded-3xl transition-all duration-300 backdrop-blur-3xl overflow-hidden"
+          className="relative rounded-3xl transition-all duration-300 backdrop-blur-3xl"
           style={{
             background: 'var(--glass-bg, rgba(255, 255, 255, 0.03))',
             border: `1px solid var(--glass-border, rgba(139, 92, 246, 0.25))`,
@@ -307,7 +307,7 @@ function AIGenerator() {
             onKeyDown={handleKey}
             placeholder="Describe what you need a prompt for..."
             rows={5}
-            className="w-full bg-transparent px-6 pt-6 pb-20 focus:outline-none text-base leading-relaxed resize-none"
+            className="w-full bg-transparent px-6 pt-6 pb-20 focus:outline-none text-base leading-relaxed resize-none rounded-3xl"
             style={{ minHeight: '150px', color: 'var(--text)', caretColor: 'var(--accent)' }}
           />
 
@@ -350,11 +350,11 @@ function AIGenerator() {
 
                 {showTypeDropdown && (
                   <div
-                    className="absolute top-full left-0 mt-2 min-w-[220px] max-h-[280px] overflow-y-auto rounded-xl z-[9999]"
+                    className="absolute bottom-full left-0 mb-2 min-w-[220px] max-h-[280px] overflow-y-auto rounded-xl z-[9999]"
                     style={{
                       background: 'var(--glass-bg, rgba(15,15,25,0.98))',
                       border: '1px solid var(--glass-border, rgba(139,92,246,0.25))',
-                      boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+                      boxShadow: '0 -8px 32px rgba(0,0,0,0.4)',
                       backdropFilter: 'blur(20px)',
                     }}
                   >
