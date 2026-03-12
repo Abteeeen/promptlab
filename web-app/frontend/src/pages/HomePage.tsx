@@ -599,6 +599,56 @@ export function HomePage() {
 
       {/* Templates */}
       <TemplatesPreview templates={templates} />
+
+      {/* Let's Connect Footer (Griflan Inspired) */}
+      <section className="relative px-6 py-32 mt-20 border-t border-[var(--glass-border)] bg-[var(--bg-2)] overflow-hidden">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-end gap-12 relative z-10">
+          
+          {/* Left Side: Massive Text Link */}
+          <div className="w-full md:w-2/3">
+            <p className="text-sm font-bold text-[var(--accent)] uppercase tracking-widest mb-6">Got an idea?</p>
+            <a 
+              href="mailto:abhiramaanil@gmail.com" 
+              className="block text-6xl sm:text-8xl lg:text-[10rem] font-black leading-[0.85] tracking-tighter text-[var(--text)] hover:text-[var(--accent)] transition-colors duration-500"
+            >
+              Let&apos;s
+              <br/>
+              Connect.
+            </a>
+          </div>
+
+          {/* Right Side: Socials & Contact Info */}
+          <div className="w-full md:w-1/3 flex flex-col gap-8 md:items-end text-left md:text-right">
+            <div>
+              <p className="text-xs text-[var(--muted)] uppercase tracking-widest mb-2 font-bold">Socials</p>
+              <div className="flex flex-col gap-1">
+                <a href="https://www.linkedin.com/in/abhiram-anil-092946223/" target="_blank" rel="noreferrer" className="text-xl font-medium text-[var(--text)] hover:text-[var(--accent)] transition-colors inline-block hover:-translate-y-1 transform duration-300">
+                  LinkedIn ↗
+                </a>
+                <a href="https://www.instagram.com/__ab_10__/" target="_blank" rel="noreferrer" className="text-xl font-medium text-[var(--text)] hover:text-[var(--accent)] transition-colors inline-block hover:-translate-y-1 transform duration-300">
+                  Instagram ↗
+                </a>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs text-[var(--muted)] uppercase tracking-widest mb-2 font-bold">Inquiries</p>
+              <a href="mailto:abhiramaanil@gmail.com" className="block text-xl font-medium text-[var(--text)] hover:text-[var(--accent)] transition-colors mb-1">
+                abhiramaanil@gmail.com
+              </a>
+              <a href="tel:8547562600" className="block text-xl font-medium text-[var(--text)] hover:text-[var(--accent)] transition-colors">
+                +91 8547 562 600
+              </a>
+            </div>
+          </div>
+          
+        </div>
+
+        {/* Huge Background Watermark */}
+        <div className="absolute -bottom-20 -left-10 text-[20vw] font-black text-[var(--text)] opacity-[0.02] pointer-events-none whitespace-nowrap overflow-hidden">
+          CONNECT
+        </div>
+      </section>
     </div>
   )
 }
