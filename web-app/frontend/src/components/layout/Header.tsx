@@ -30,8 +30,8 @@ export function Header() {
 
   return (
     <>
-      {/* Separated Logo - Always visible, fixed to the top left */}
-      <div className="fixed top-6 left-4 md:left-8 z-[60] pointer-events-auto">
+      {/* Separated Logo - Static on mobile (top of page), fixed on desktop */}
+      <div className="absolute md:fixed top-6 left-4 md:left-8 z-[60] pointer-events-auto">
         <Link to="/" className="flex items-center gap-3 group">
           <div className="relative">
             <img
