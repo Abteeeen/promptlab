@@ -117,38 +117,44 @@ function AIGenerator() {
   const [editedPrompt, setEditedPrompt] = useState('')
   const [promptType, setPromptType] = useState<PromptType>('auto')
   const [showTypeDropdown, setShowTypeDropdown] = useState(false)
+  const [showOptionsPanel, setShowOptionsPanel] = useState(false)
   const [fileName, setFileName] = useState<string | null>(null)
   const [feedbackGiven, setFeedbackGiven] = useState<'up' | 'down' | null>(null)
 
   // ─── Persona Mode ───────────────────────────────────────────────
   type Persona = 'auto' | 'ceo' | 'developer' | 'academic' | 'creative'
   const PERSONAS: { id: Persona; label: string; emoji: string; hint: string }[] = [
-    { id: 'auto',      label: 'Auto',       emoji: '✨', hint: 'Smart default' },
-    { id: 'ceo',       label: 'CEO',        emoji: '💼', hint: 'Executive, strategic, ROI-focused' },
-    { id: 'developer', label: 'Dev',        emoji: '💻', hint: 'Technical, precise, code-first' },
-    { id: 'academic',  label: 'Academic',   emoji: '📚', hint: 'Rigorous, citations, formal' },
-    { id: 'creative',  label: 'Creative',   emoji: '🎨', hint: 'Imaginative, bold, story-driven' },
+    { id: 'auto',      label: 'Auto',     emoji: '✨', hint: 'Smart default' },
+    { id: 'ceo',       label: 'CEO',      emoji: '💼', hint: 'Executive, strategic, ROI-focused' },
+    { id: 'developer', label: 'Dev',      emoji: '💻', hint: 'Technical, precise, code-first' },
+    { id: 'academic',  label: 'Academic', emoji: '📚', hint: 'Rigorous, citations, formal' },
+    { id: 'creative',  label: 'Creative', emoji: '🎨', hint: 'Imaginative, bold, story-driven' },
   ]
   const [persona, setPersona] = useState<Persona>('auto')
 
   // ─── Output Length ──────────────────────────────────────────────
   type PromptLength = 'focused' | 'standard' | 'detailed'
-  const LENGTHS: { id: PromptLength; label: string; hint: string }[] = [
-    { id: 'focused',  label: '⚡ Focused',  hint: '~100 words, sharp & direct' },
-    { id: 'standard', label: '📝 Standard', hint: '~300 words, balanced' },
-    { id: 'detailed', label: '🔍 Detailed', hint: '~600 words, exhaustive' },
+  const LENGTHS: { id: PromptLength; label: string; words: string }[] = [
+    { id: 'focused',  label: '⚡ Focused',  words: '~100 words' },
+    { id: 'standard', label: '📝 Standard', words: '~300 words' },
+    { id: 'detailed', label: '🔍 Detailed', words: '~600 words' },
   ]
   const [promptLength, setPromptLength] = useState<PromptLength>('standard')
+
+  const optionsPanelRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const resultRef = useRef<HTMLDivElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Close dropdown when clicking outside
+  // Close both dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setShowTypeDropdown(false)
+      }
+      if (optionsPanelRef.current && !optionsPanelRef.current.contains(e.target as Node)) {
+        setShowOptionsPanel(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -301,8 +307,8 @@ function AIGenerator() {
             onKeyDown={handleKey}
             placeholder="Describe what you need a prompt for..."
             rows={5}
-            className="w-full bg-transparent px-6 pt-6 pb-28 text-white placeholder:text-white/30 focus:outline-none text-base leading-relaxed resize-none"
-            style={{ minHeight: '160px' }}
+            className="w-full bg-transparent px-6 pt-6 pb-20 focus:outline-none text-base leading-relaxed resize-none"
+            style={{ minHeight: '150px', color: 'var(--text)', caretColor: 'var(--accent)' }}
           />
 
           {/* File attachment indicator */}
@@ -319,133 +325,178 @@ function AIGenerator() {
             </div>
           )}
 
-          {/* Bottom Bar */}
-          <div className="absolute bottom-0 left-0 right-0 px-3 pb-2 pt-1 flex flex-col gap-1.5 bg-gradient-to-t from-black/30 to-transparent">
+          {/* Bottom Bar - single clean row */}
+          <div className="absolute bottom-0 left-0 right-0 h-14 px-3 flex items-center justify-between"
+            style={{ background: 'linear-gradient(to top, var(--bg, rgba(0,0,0,0.4)) 0%, transparent 100%)' }}
+          >
+            {/* Left: Type dropdown + file + OPTIONS BUTTON */}
+            <div className="flex items-center gap-2">
 
-            {/* Row 1: Persona Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
-              <span className="text-[9px] text-white/30 font-medium uppercase tracking-wider shrink-0">Persona</span>
-              {PERSONAS.map(p => (
+              {/* Prompt Type Dropdown */}
+              <div className="relative" ref={dropdownRef}>
                 <button
-                  key={p.id}
-                  onClick={() => setPersona(p.id)}
-                  title={p.hint}
-                  className={`shrink-0 flex items-center gap-1 h-6 px-2 rounded-lg text-[10px] font-medium transition-all ${
-                    persona === p.id
-                      ? 'bg-purple-500/30 text-purple-300 border border-purple-500/50'
-                      : 'text-white/50 bg-white/[0.04] border border-white/[0.08] hover:text-white/80 hover:bg-white/[0.08]'
-                  }`}
+                  onClick={() => setShowTypeDropdown(!showTypeDropdown)}
+                  className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-medium transition-all"
+                  style={{
+                    color: 'var(--muted)',
+                    background: 'var(--glass-bg, rgba(255,255,255,0.06))',
+                    border: '1px solid var(--glass-border, rgba(255,255,255,0.1))',
+                  }}
                 >
-                  <span>{p.emoji}</span>
-                  <span>{p.label}</span>
+                  <span style={{ opacity: 0.6 }}>Type:</span>
+                  <span style={{ color: 'var(--text)' }}>{PROMPT_TYPE_CONFIG[promptType].label}</span>
+                  <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${showTypeDropdown ? 'rotate-180' : ''}`} />
                 </button>
-              ))}
-              <span className="text-white/10 mx-1">|</span>
-              <span className="text-[9px] text-white/30 font-medium uppercase tracking-wider shrink-0">Length</span>
-              {LENGTHS.map(l => (
-                <button
-                  key={l.id}
-                  onClick={() => setPromptLength(l.id)}
-                  title={l.hint}
-                  className={`shrink-0 flex items-center h-6 px-2 rounded-lg text-[10px] font-medium transition-all ${
-                    promptLength === l.id
-                      ? 'bg-cyan-500/25 text-cyan-300 border border-cyan-500/40'
-                      : 'text-white/50 bg-white/[0.04] border border-white/[0.08] hover:text-white/80 hover:bg-white/[0.08]'
-                  }`}
-                >
-                  {l.label}
-                </button>
-              ))}
-            </div>
 
-            {/* Row 2: Type dropdown + file + send */}
-            <div className="flex items-center justify-between">
-              {/* Left: Prompt Type & File Upload */}
-              <div className="flex items-center gap-2">
-                {/* Prompt Type Dropdown */}
-                <div className="relative" ref={dropdownRef}>
-                  <button
-                    onClick={() => setShowTypeDropdown(!showTypeDropdown)}
-                    className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-medium text-white/70 bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] hover:border-white/[0.2] transition-all"
+                {showTypeDropdown && (
+                  <div
+                    className="absolute top-full left-0 mt-2 min-w-[220px] max-h-[280px] overflow-y-auto rounded-xl z-[9999]"
+                    style={{
+                      background: 'var(--glass-bg, rgba(15,15,25,0.98))',
+                      border: '1px solid var(--glass-border, rgba(139,92,246,0.25))',
+                      boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+                      backdropFilter: 'blur(20px)',
+                    }}
                   >
-                    <span className="text-white/50">Type:</span>
-                    <span className="text-white/90">{PROMPT_TYPE_CONFIG[promptType].label}</span>
-                    <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${showTypeDropdown ? 'rotate-180' : ''}`} />
-                  </button>
+                    {(Object.keys(PROMPT_TYPE_CONFIG) as PromptType[]).map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => { setPromptType(type); setShowTypeDropdown(false) }}
+                        className="w-full px-3 py-1.5 text-left text-[10px] transition-colors flex items-center justify-between"
+                        style={{ color: promptType === type ? 'var(--accent)' : 'var(--muted)' }}
+                      >
+                        <div>
+                          <span className="font-medium" style={{ color: 'var(--text)' }}>{PROMPT_TYPE_CONFIG[type].label}</span>
+                          <p className="text-[9px] opacity-50 mt-0">{PROMPT_TYPE_CONFIG[type].hint}</p>
+                        </div>
+                        {promptType === type && <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--accent)' }} />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
-                  {/* Dropdown Menu - Opens Downward */}
-                  {showTypeDropdown && (
-                    <div
-                      className="absolute top-full left-0 mt-2 min-w-[220px] max-h-[280px] overflow-y-auto rounded-xl overflow-hidden z-[9999]"
-                      style={{
-                        background: 'rgba(15, 15, 25, 0.98)',
-                        border: '1px solid rgba(139, 92, 246, 0.25)',
-                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-                      }}
-                    >
-                      {(Object.keys(PROMPT_TYPE_CONFIG) as PromptType[]).map((type) => (
+              {/* File Upload */}
+              <input ref={fileRef} type="file" accept=".txt,.md,.csv,.json,.log" className="hidden" onChange={handleFileUpload} />
+              <button
+                onClick={() => fileRef.current?.click()}
+                className="flex items-center justify-center w-8 h-8 rounded-xl transition-all"
+                title="Upload context file"
+                style={{
+                  color: 'var(--muted)',
+                  background: 'var(--glass-bg, rgba(255,255,255,0.06))',
+                  border: '1px solid var(--glass-border, rgba(255,255,255,0.1))',
+                }}
+              >
+                <PaperclipIcon className="w-4 h-4" />
+              </button>
+
+              {/* ⚙ Options Toggle — compact badge shows active non-default selections */}
+              <div className="relative" ref={optionsPanelRef}>
+                <button
+                  onClick={() => setShowOptionsPanel(!showOptionsPanel)}
+                  className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-medium transition-all"
+                  style={{
+                    color: (persona !== 'auto' || promptLength !== 'standard') ? 'var(--accent)' : 'var(--muted)',
+                    background: showOptionsPanel ? 'rgba(139,92,246,0.15)' : 'var(--glass-bg, rgba(255,255,255,0.06))',
+                    border: showOptionsPanel
+                      ? '1px solid rgba(139,92,246,0.5)'
+                      : '1px solid var(--glass-border, rgba(255,255,255,0.1))',
+                  }}
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
+                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07M8.46 8.46a5 5 0 0 0 0 7.07"/>
+                  </svg>
+                  <span>Options</span>
+                  {(persona !== 'auto' || promptLength !== 'standard') && (
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--accent)' }} />
+                  )}
+                </button>
+
+                {/* Floating options panel — slides up above the bar */}
+                {showOptionsPanel && (
+                  <div
+                    className="absolute bottom-full left-0 mb-3 w-72 rounded-2xl p-4 z-[9999]"
+                    style={{
+                      background: 'var(--glass-bg, rgba(15,15,25,0.97))',
+                      border: '1px solid var(--glass-border, rgba(139,92,246,0.2))',
+                      boxShadow: '0 -8px 40px rgba(0,0,0,0.35)',
+                      backdropFilter: 'blur(24px)',
+                    }}
+                  >
+                    {/* Persona Section */}
+                    <p className="text-[9px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--muted)' }}>Persona Mode</p>
+                    <div className="flex flex-wrap gap-1.5 mb-4">
+                      {PERSONAS.map(p => (
                         <button
-                          key={type}
-                          onClick={() => {
-                            setPromptType(type)
-                            setShowTypeDropdown(false)
+                          key={p.id}
+                          onClick={() => setPersona(p.id)}
+                          title={p.hint}
+                          className="flex items-center gap-1 h-7 px-2.5 rounded-xl text-[11px] font-medium transition-all"
+                          style={{
+                            color: persona === p.id ? 'var(--accent)' : 'var(--muted)',
+                            background: persona === p.id ? 'rgba(139,92,246,0.18)' : 'var(--glass-bg)',
+                            border: persona === p.id ? '1px solid rgba(139,92,246,0.5)' : '1px solid var(--glass-border)',
+                            fontWeight: persona === p.id ? 600 : 400,
                           }}
-                          className={`w-full px-3 py-1.5 text-left text-[10px] transition-colors flex items-center justify-between ${promptType === type
-                              ? 'bg-purple-500/15 text-white'
-                              : 'text-white/70 hover:bg-white/[0.05] hover:text-white'
-                            }`}
                         >
-                          <div>
-                            <span className="font-medium">{PROMPT_TYPE_CONFIG[type].label}</span>
-                            <p className="text-[9px] text-white/40 mt-0">{PROMPT_TYPE_CONFIG[type].hint}</p>
-                          </div>
-                          {promptType === type && (
-                            <div className="w-1.5 h-1.5 rounded-full bg-purple-400" />
-                          )}
+                          <span>{p.emoji}</span>
+                          <span style={{ color: 'var(--text)' }}>{p.label}</span>
                         </button>
                       ))}
                     </div>
-                  )}
-                </div>
 
-                {/* File Upload Button */}
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept=".txt,.md,.csv,.json,.log"
-                  className="hidden"
-                  onChange={handleFileUpload}
-                />
-                <button
-                  onClick={() => fileRef.current?.click()}
-                  className="flex items-center justify-center w-8 h-8 rounded-xl text-white/50 hover:text-white/80 bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] hover:border-white/[0.2] transition-all"
-                  title="Upload context file"
-                >
-                  <PaperclipIcon className="w-4 h-4" />
-                </button>
-              </div>
+                    {/* Divider */}
+                    <hr style={{ borderColor: 'var(--glass-border)', marginBottom: '12px' }} />
 
-              {/* Right: Character count & Send Button */}
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-white/30 hidden sm:inline">
-                  {input.length > 0 ? `${input.length} chars` : 'Ctrl+Enter'}
-                </span>
-                <button
-                  onClick={() => generate()}
-                  disabled={loading || input.trim().length < 5}
-                  className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-r from-purple-500 to-violet-600 text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/60 hover:scale-[1.02] active:scale-95 transition-all duration-200 disabled:opacity-40 disabled:pointer-events-none disabled:scale-100"
-                >
-                  {loading ? (
-                    <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3" />
-                      <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-                    </svg>
-                  ) : (
-                    <SendIcon className="w-4 h-4" />
-                  )}
-                </button>
+                    {/* Length Section */}
+                    <p className="text-[9px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--muted)' }}>Output Length</p>
+                    <div className="flex gap-1.5">
+                      {LENGTHS.map(l => (
+                        <button
+                          key={l.id}
+                          onClick={() => setPromptLength(l.id)}
+                          title={l.words}
+                          className="flex-1 py-2 rounded-xl text-[11px] font-medium text-center transition-all"
+                          style={{
+                            color: promptLength === l.id ? 'var(--accent)' : 'var(--muted)',
+                            background: promptLength === l.id ? 'rgba(6,182,212,0.15)' : 'var(--glass-bg)',
+                            border: promptLength === l.id ? '1px solid rgba(6,182,212,0.4)' : '1px solid var(--glass-border)',
+                            fontWeight: promptLength === l.id ? 600 : 400,
+                          }}
+                        >
+                          <div style={{ color: 'var(--text)' }}>{l.label}</div>
+                          <div className="text-[9px] opacity-50 mt-0.5">{l.words}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>{/* End Row 2 */}
+            </div>
+
+            {/* Right: char count + Send */}
+            <div className="flex items-center gap-3">
+              <span className="text-xs hidden sm:inline" style={{ color: 'var(--muted)', opacity: 0.6 }}>
+                {input.length > 0 ? `${input.length} chars` : 'Ctrl+Enter'}
+              </span>
+              <button
+                onClick={() => generate()}
+                disabled={loading || input.trim().length < 5}
+                className="flex items-center justify-center w-10 h-10 rounded-xl text-white shadow-lg hover:scale-[1.02] active:scale-95 transition-all duration-200 disabled:opacity-40 disabled:pointer-events-none disabled:scale-100"
+                style={{ background: 'linear-gradient(135deg, #7c3aed, #06b6d4)', boxShadow: '0 0 20px rgba(124,58,237,0.35)' }}
+              >
+                {loading ? (
+                  <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3" />
+                    <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                  </svg>
+                ) : (
+                  <SendIcon className="w-4 h-4" />
+                )}
+              </button>
+            </div>
           </div>{/* End Bottom Bar */}
         </div>{/* End Main Input Container */}
 
