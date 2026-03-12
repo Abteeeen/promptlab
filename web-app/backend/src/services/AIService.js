@@ -3,7 +3,12 @@ import { loadTemplates } from './TemplateService.js';
 import { createClient } from '@supabase/supabase-js';
 import { pipeline } from '@xenova/transformers';
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+let supabase = null;
+if (supabaseUrl && supabaseKey) {
+  supabase = createClient(supabaseUrl, supabaseKey);
+}
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
 
 let extractor = null;
@@ -33,6 +38,7 @@ async function tavilySearch(query) {
 
 // Level 2: Supabase RAG
 async function getSupabaseContext(userRequest) {
+  if (!supabase) return '';
   try {
     const fn = await getExtractor();
     const output = await fn(userRequest, { pooling: 'mean', normalize: true });
@@ -696,18 +702,30 @@ Format: [style], [subject], [setting], [mood], [technical details]
 
 Example: Warm cinematic photo of a happy family of 4 sitting on a picnic blanket in a sunny park, golden hour lighting, shot on 85mm lens, shallow depth of field, authentic candid moment`;
 
-// ── Groq API call helper ─────────────────────────────────────────────────────
-async function callGroq(userRequest, systemPrompt) {
-  const apiKey = process.env.GROQ_API_KEY;
-  
-  const res = await fetch(GROQ_URL, {
+// ── AI API call helper (Groq & OpenRouter) ─────────────────────────────────────────────────────
+async function callAI(userRequest, systemPrompt, provider = 'groq', modelOverride = null) {
+  let url = GROQ_URL;
+  let apiKey = process.env.GROQ_API_KEY;
+  let model = modelOverride || MODEL;
+
+  if (provider === 'openrouter') {
+    url = 'https://openrouter.ai/api/v1/chat/completions';
+    // User requested explicitly to use this specific free key directly inside the code for Agent 1 and 2
+    apiKey = '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';
+  }
+
+  const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
+      ...(provider === 'openrouter' && {
+        'HTTP-Referer': 'https://promptengine.com',
+        'X-Title': 'Prompt Engine',
+      })
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: model,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: `Transform this into a perfect prompt.
@@ -729,7 +747,7 @@ User request: ${userRequest}` },
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || `Groq API error ${res.status}`);
+    throw new Error(err.error?.message || `${provider} API error ${res.status}`);
   }
 
   return res.json();
@@ -770,7 +788,7 @@ export async function generateWithAI(userRequest) {
 
     // Agent A: Researcher (Analyzes idea)
     const researcherPrompt = `You are a Strategic Researcher. Analyze this request and provide a strict 3-point strategy for writing an AI prompt for it. Include target audience, constraints, and format. Only output the strategy.`;
-    const researcherData = await callGroq(augmentedRequest, researcherPrompt);
+    const researcherData = await callAI(augmentedRequest, researcherPrompt, 'openrouter', 'meta-llama/llama-3.3-70b-instruct:free');
     const strategy = researcherData.choices?.[0]?.message?.content?.trim();
 
     // Agent B: Drafter
@@ -781,13 +799,13 @@ export async function generateWithAI(userRequest) {
     let drafterInput = `USER REQUEST:\n${augmentedRequest}\n\nRESEARCHER STRATEGY:\n${strategy}`;
     if (ragContext) drafterInput += `\n\nHIGHLY SUCCESSFUL RAG EXAMPLES:\n${ragContext}`;
 
-    const draftData = await callGroq(drafterInput, systemPrompt);
+    const draftData = await callAI(drafterInput, systemPrompt, 'openrouter', 'google/gemini-2.0-flash-exp:free');
     let draftText = draftData.choices?.[0]?.message?.content?.trim();
     if (!draftText) throw new Error('Empty draft response from AI');
 
     // Agent C: Critic (Grades and Refines)
     const criticPrompt = `You are an Expert Prompt Critic. Review this draft AI prompt. If it scores 9/10 or 10/10 for specificity, constraints, and format, return EXACTLY the same prompt. If < 9/10, rewrite it to be bulletproof. OUTPUT ONLY THE FINAL PROMPT, no preamble.`;
-    const criticData = await callGroq(draftText, criticPrompt);
+    const criticData = await callAI(draftText, criticPrompt, 'groq', MODEL);
     let text = criticData.choices?.[0]?.message?.content?.trim();
     if (!text || text.length < 50) text = draftText; // Fallback if critic fails
 
