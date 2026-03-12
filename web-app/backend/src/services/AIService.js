@@ -651,7 +651,7 @@ ${OUTPUT_FORMAT_RULES[detectedType] || OUTPUT_FORMAT_RULES.default}`;
 
   systemPrompt += buildFewShotSection(detectedDomain);
 
-  // Inject domain-specific template context if detected
+  // Inject domain-specific context (pro tips + quality checklist — NOT the raw template skeleton)
   if (template) {
     systemPrompt += `\n\nDOMAIN CONTEXT (${template.name}):
 You are generating a prompt for the "${template.name}" domain (${template.domain}).
@@ -671,10 +671,8 @@ You are generating a prompt for the "${template.name}" domain (${template.domain
         systemPrompt += `- ${item}\n`;
       });
     }
-
-    if (template.mainTemplate) {
-      systemPrompt += `\nEXPERT TEMPLATE STRUCTURE TO FOLLOW:\n${template.mainTemplate.slice(0, 800)}\n`;
-    }
+    // NOTE: mainTemplate is intentionally NOT injected here.
+    // It contains raw placeholder text like [TOPIC], [INDUSTRY] which causes AI to output blanks instead of content.
   }
 
   systemPrompt += `
