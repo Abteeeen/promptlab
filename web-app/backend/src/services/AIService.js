@@ -742,165 +742,154 @@ async function callAI(systemPrompt, userContent, provider = 'groq', modelOverrid
   return res.json();
 }
 
+// ── Resilient AI call — tries primary provider, falls back to Groq ─────────
+async function callAIResilient(systemPrompt, userContent, provider = 'groq', modelOverride = null) {
+  try {
+    return await callAI(systemPrompt, userContent, provider, modelOverride);
+  } catch (err) {
+    logger.warn(`${provider} call failed, falling back to Groq`, { error: err.message });
+    // If primary provider failed, retry on Groq with main model
+    return await callAI(systemPrompt, userContent, 'groq', MODEL);
+  }
+}
+
 // ── Main AI generation function ───────────────────────────────────────────────
 export async function generateWithAI(userRequest) {
   const apiKey = process.env.GROQ_API_KEY;
 
-  // Detect image request at the top
-  const isImageRequest = /photo|image|picture|illustration|draw|render|visual|portrait|artwork/i.test(userRequest);
-
-  // Detect domain and prompt type from user request
-  const detectedDomain = detectDomain(userRequest);
-  const detectedType = detectPromptType(userRequest);
-  
-  if (detectedDomain) {
-    logger.debug('Domain detected', { domain: detectedDomain });
-  }
-  if (detectedType !== 'auto') {
-    logger.debug('Prompt type detected', { type: detectedType });
-  }
+  // Step 1: Detect image request and domain FIRST before any async work
+  const isImageRequest = /photo|image|picture|illustration|draw|render|visual|portrait|artwork|family photo/i.test(userRequest);
+  const detectedDomain = isImageRequest ? null : detectDomain(userRequest);
+  const detectedType = isImageRequest ? 'image' : detectPromptType(userRequest);
 
   if (!apiKey) {
-    logger.warn('GROQ_API_KEY not set — using fallback generation');
-    return fallbackGenerate(userRequest, detectedDomain, detectedType);
+    logger.warn('GROQ_API_KEY not set — using emergency fallback');
+    return emergencyFallback(userRequest, isImageRequest);
   }
 
+  // Step 2: Context gathering (optional enrichment — failures are silent)
+  let webContext = '';
+  let ragContext = '';
   try {
-    // Phase 1: Context Gathering (Web Search + Supabase RAG) — runs in parallel
-    const [webContext, ragContext] = await Promise.all([
+    const results = await Promise.allSettled([
       tavilySearch(userRequest),
       getSupabaseContext(userRequest)
     ]);
+    webContext = results[0].status === 'fulfilled' ? results[0].value : '';
+    ragContext = results[1].status === 'fulfilled' ? results[1].value : '';
+  } catch (err) {
+    logger.warn('Context gathering failed silently', { error: err.message });
+  }
 
-    // Build enriched request with live context
-    let augmentedRequest = userRequest;
-    if (webContext) augmentedRequest += `\n\nLIVE WEB CONTEXT (use this to ground your analysis in current facts):\n${webContext}`;
+  let augmentedRequest = userRequest;
+  if (webContext) augmentedRequest += `\n\nLIVE WEB CONTEXT:\n${webContext}`;
 
-    // ─── Agent A: RESEARCHER ──────────────────────────────────────────────────
-    // Purpose: Analyze the idea and return a strategic plan only (no prompt yet)
+  // ─── Agent A: RESEARCHER ─────────────────────────────────────────────────────
+  let strategy = '';
+  try {
     const researcherSystemPrompt = `You are a Strategic Prompt Engineer Researcher.
-Your ONLY job is to analyze a user's request and write a concise 3-point strategy for crafting the perfect AI prompt for it.
-Outputs:
+Your ONLY job: analyze a user request and write a 3-point strategy for crafting the perfect AI prompt.
 1. Target Audience (who will use this prompt?)
 2. Key Constraints (what must the prompt include or avoid?)
-3. Best format/structure for the final prompt (ROLE/TASK/REQUIREMENTS, or COSTAR, etc.)
-Do NOT write the prompt itself. Output ONLY the 3-point strategy, nothing else.`;
+3. Best format/structure (ROLE/TASK/REQUIREMENTS, COSTAR, image prompt, etc.)
+Do NOT write the prompt. Output ONLY the 3-point strategy.`;
 
-    const researcherInput = `Analyze this user request and return a 3-point strategy:\n\n"${augmentedRequest}"`;
-    const researcherData = await callAI(researcherSystemPrompt, researcherInput, 'openrouter', 'meta-llama/llama-3.3-70b-instruct:free');
-    const strategy = researcherData.choices?.[0]?.message?.content?.trim() || '';
+    const researcherInput = `Analyze this request:\n"${augmentedRequest}"`;
+    const researcherData = await callAIResilient(researcherSystemPrompt, researcherInput, 'openrouter', 'meta-llama/llama-3.3-70b-instruct:free');
+    strategy = researcherData.choices?.[0]?.message?.content?.trim() || '';
+    logger.debug('Researcher Agent completed', { strategyLength: strategy.length });
+  } catch (err) {
+    logger.warn('Researcher Agent failed, continuing without strategy', { error: err.message });
+  }
 
-    // ─── Agent B: DRAFTER ────────────────────────────────────────────────────
-    // Purpose: Write the full expert prompt, powered by: user request + strategy + RAG + system rules
+  // ─── Agent B: DRAFTER ────────────────────────────────────────────────────────
+  let draftText = '';
+  try {
     const drafterSystemPrompt = isImageRequest
       ? IMAGE_SYSTEM_PROMPT
       : buildSystemPrompt(detectedDomain, detectedType);
 
-    let drafterUserContent = `Write a complete, expert-level AI prompt for the following user request.
+    let drafterUserContent;
+    if (isImageRequest) {
+      drafterUserContent = `Create a detailed image generation prompt for: "${userRequest}"`;
+    } else {
+      drafterUserContent = `Write a complete, expert-level AI prompt for:\n"${userRequest}"\n\nRESEARCHER STRATEGY:\n${strategy || 'Apply COSTAR framework with full role, task, requirements, and constraints.'}`;
+      if (ragContext) drafterUserContent += `\n\nSUCCESSFUL EXAMPLE PROMPTS (use for structural inspiration only):\n${ragContext}`;
+      drafterUserContent += `\n\nAPPLY:\n1. Define AUDIENCE explicitly\n2. Set CONSTRAINTS (budget, length, format)\n3. Use COSTAR or RISEN framework\n4. Include edge cases\n5. End with SELF-REVIEW instruction\n\nWrite ONLY the final AI prompt:`;
+    }
 
-USER REQUEST: "${userRequest}"\n\nRESEARCHER STRATEGY:\n${strategy}`;
-    if (ragContext) drafterUserContent += `\n\nHIGHLY SUCCESSFUL EXAMPLE PROMPTS (use these as structural inspiration):\n${ragContext}`;
-    drafterUserContent += `\n\nAPPLY THESE TECHNIQUES:\n1. Define the AUDIENCE explicitly\n2. Add CONFIDENCE LEVEL instructions if factual claims are involved\n3. Set specific CONSTRAINTS (budget, timeline, length, format)\n4. Use COSTAR or RISEN framework\n5. Include at least ONE edge case or negative example\n6. End with a SELF-REVIEW instruction\n\nNow write the complete, final AI prompt:`;
-
-    const draftData = await callAI(drafterSystemPrompt, drafterUserContent, 'openrouter', 'google/gemini-2.0-flash-exp:free');
-    let draftText = draftData.choices?.[0]?.message?.content?.trim();
-    if (!draftText) throw new Error('Empty draft response from Drafter Agent');
-
-    // ─── Agent C: CRITIC ────────────────────────────────────────────────────
-    // Purpose: Quality-review the draft and rewrite it if score < 9/10
-    const criticSystemPrompt = `You are an expert AI Prompt Critic and Quality Reviewer.
-Your job: Review the draft prompt below and score it on: Specificity, Audience Clarity, Constraints, Format, and Edge Case Coverage.
-If the score is 9/10 or 10/10, return the prompt EXACTLY as-is.
-If the score is below 9/10, rewrite the prompt to fix its weaknesses and return only the final improved version.
-IMPORTANT: Output ONLY the final prompt text. No preamble, no scores, no explanations.`;
-
-    const criticInput = `Review and improve this AI prompt if needed:\n\n${draftText}`;
-    const criticData = await callAI(criticSystemPrompt, criticInput, 'groq', MODEL);
-    let text = criticData.choices?.[0]?.message?.content?.trim();
-    if (!text || text.length < 80) text = draftText; // Fallback if critic returns garbage
-
-    logger.debug('AI prompt generated by 3-agent pipeline', {
-      model: MODEL,
-      domain: detectedDomain || 'generic',
-      type: isImageRequest ? 'image' : detectedType,
-    });
-
-    return {
-      prompt: text,
-      model: MODEL,
-      source: 'groq',
-      domain: detectedDomain,
-      detectedType: isImageRequest ? 'image' : detectedType,
-    };
-
+    const draftData = await callAIResilient(drafterSystemPrompt, drafterUserContent, 'openrouter', 'google/gemini-2.0-flash-exp:free');
+    draftText = draftData.choices?.[0]?.message?.content?.trim();
+    logger.debug('Drafter Agent completed', { draftLength: draftText?.length });
   } catch (err) {
-    logger.warn('AI generation failed, using fallback', { error: err.message });
-    return fallbackGenerate(userRequest, detectedDomain, detectedType);
-  }
-}
-
-// ── Fallback: research-backed offline generation ──────────────────────────────
-function fallbackGenerate(userRequest, detectedDomain, detectedType = 'auto') {
-  const templates = loadTemplates();
-  const template = detectedDomain
-    ? templates.find(t => t.id === detectedDomain)
-    : null;
-
-  // Use domain template structure if available
-  if (template && template.mainTemplate) {
-    const filled = template.mainTemplate
-      .replace(/\[TASK\/GOAL\]/gi, userRequest)
-      .replace(/\[YOUR TASK\]/gi, userRequest)
-      .replace(/\[DESCRIBE YOUR TASK\]/gi, userRequest)
-      .slice(0, 1500);
-
-    return {
-      prompt: filled,
-      model: 'template',
-      source: 'template',
-      domain: detectedDomain,
-      detectedType,
-    };
+    logger.warn('Drafter Agent failed', { error: err.message });
   }
 
-  // Generic research-backed fallback
-  const prompt = `ROLE:
-You are a world-class expert with deep knowledge relevant to the following task. Apply professional-grade precision, clarity, and domain expertise.
+  // If Drafter completely failed, use Groq directly as emergency drafter
+  if (!draftText || draftText.length < 50) {
+    logger.warn('Drafter failed — running emergency Groq drafter');
+    try {
+      const emergencySystemPrompt = isImageRequest ? IMAGE_SYSTEM_PROMPT : buildSystemPrompt(detectedDomain, detectedType);
+      const emergencyInput = isImageRequest
+        ? `Create a detailed image generation prompt for: "${userRequest}"`
+        : `Write a complete expert AI prompt for: "${userRequest}". Use ROLE/TASK/REQUIREMENTS/CONSTRAINTS/OUTPUT FORMAT structure. Be highly detailed and specific.`;
+      const emergencyData = await callAI(emergencySystemPrompt, emergencyInput, 'groq', MODEL);
+      draftText = emergencyData.choices?.[0]?.message?.content?.trim();
+    } catch (err) {
+      logger.error('Emergency Groq drafter also failed', { error: err.message });
+      return emergencyFallback(userRequest, isImageRequest);
+    }
+  }
 
-TASK:
-${userRequest}
+  // ─── Agent C: CRITIC ─────────────────────────────────────────────────────────
+  let finalText = draftText;
+  if (!isImageRequest) { // Don't run critic on image prompts — they should be concise
+    try {
+      const criticSystemPrompt = `You are an expert AI Prompt Critic.
+Review the draft prompt. Score it on: Specificity, Audience, Constraints, Format, Edge Cases.
+If 9/10 or 10/10 → return it EXACTLY as-is.
+If < 9/10 → rewrite it to be perfect.
+OUTPUT: ONLY the final prompt. No preamble, no scores, no explanations.`;
 
-REQUIREMENTS:
-- Provide a thorough, accurate, and well-structured response
-- Be specific — use concrete examples, numbers, and measurable criteria
-- Prioritise the most important information first
-- Consider edge cases and common pitfalls proactively
-- Ensure every output is immediately actionable
+      const criticInput = `Review and improve if needed:\n\n${draftText}`;
+      const criticData = await callAIResilient(criticSystemPrompt, criticInput, 'groq', MODEL);
+      const criticText = criticData.choices?.[0]?.message?.content?.trim();
+      if (criticText && criticText.length > 80) finalText = criticText;
+      logger.debug('Critic Agent completed');
+    } catch (err) {
+      logger.warn('Critic Agent failed, using draft as-is', { error: err.message });
+    }
+  }
 
-CONSTRAINTS:
-- Do not make assumptions — if something is unclear, acknowledge it explicitly
-- Be honest about uncertainty; never fabricate facts or statistics
-- Keep the response focused and free of filler content
-- Maintain a professional tone appropriate for the subject matter
-
-CONTEXT:
-Treat this as a high-stakes deliverable being reviewed by a senior expert. The output must meet production-ready standards.
-
-OUTPUT FORMAT:
-- Use clear headings and bullet points where appropriate
-- Lead with the most critical information
-- Include a brief action summary at the end
-- Highlight any warnings, caveats, or important considerations
-
-QUALITY STANDARD:
-Every claim must be accurate. Every recommendation must be actionable. Every section must add value.`;
+  logger.debug('3-Agent pipeline complete', { domain: detectedDomain, type: detectedType, isImageRequest });
 
   return {
-    prompt,
-    model: 'fallback',
+    prompt: finalText,
+    model: MODEL,
+    source: 'groq',
+    domain: detectedDomain,
+    detectedType: isImageRequest ? 'image' : detectedType,
+  };
+}
+
+// ── Emergency fallback when even Groq fails ────────────────────────────────────
+function emergencyFallback(userRequest, isImageRequest = false) {
+  if (isImageRequest) {
+    return {
+      prompt: `Photorealistic ${userRequest}, warm golden hour lighting, shot on 85mm lens, shallow depth of field, candid authentic moment, 8k resolution, highly detailed, professional photography, --ar 16:9 --q 2`,
+      model: 'emergency-fallback',
+      source: 'template',
+      domain: null,
+      detectedType: 'image',
+    };
+  }
+
+  return {
+    prompt: `ROLE: You are a world-class domain expert.\n\nTASK: ${userRequest}\n\nREQUIREMENTS:\n- Be specific with concrete examples and measurable criteria\n- Define your target audience clearly\n- Include constraints and edge cases\n\nCONSTRAINTS:\n- No assumptions — flag unclear information explicitly\n- No fabricated facts\n\nOUTPUT FORMAT: Structured headings with actionable recommendations`,
+    model: 'emergency-fallback',
     source: 'template',
     domain: null,
-    detectedType,
+    detectedType: 'auto',
   };
 }
 
