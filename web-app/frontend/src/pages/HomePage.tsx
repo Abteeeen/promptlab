@@ -435,7 +435,7 @@ function AIGenerator() {
                 {/* Floating options panel — slides up above the bar */}
                 {showOptionsPanel && (
                   <div
-                    className="absolute bottom-full left-0 mb-3 w-72 rounded-2xl p-4 z-[9999]"
+                    className="absolute bottom-full -left-10 sm:left-0 mb-3 w-[calc(100vw-3rem)] sm:w-72 max-w-[320px] rounded-2xl p-4 z-[9999]"
                     style={{
                       background: 'var(--glass-bg, rgba(15,15,25,0.97))',
                       border: '1px solid var(--glass-border, rgba(139,92,246,0.2))',
@@ -680,10 +680,11 @@ function TemplatesPreview({ templates }: { templates: Template[] }) {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 overflow-hidden">
-        {templates.slice(0, 5).map(t => <TemplateCard key={t.id} template={t} />)}
+        {templates.slice(0, 4).map(t => <TemplateCard key={t.id} template={t} />)}
+        {templates.slice(4, 5).map(t => <div className="hidden sm:block" key={t.id}><TemplateCard template={t} /></div>)}
       </div>
 
-      <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 overflow-hidden">
+      <div className="hidden sm:grid mt-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 overflow-hidden">
         {templates.slice(5, 10).map(t => <TemplateCard key={t.id} template={t} compact />)}
       </div>
     </section>

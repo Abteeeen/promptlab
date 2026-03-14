@@ -256,7 +256,7 @@ export default function PromptHistory({ onLoad }: PromptHistoryProps) {
       {/* Floating trigger button */}
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed left-4 top-1/2 -translate-y-1/2 z-40 flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] hover:border-purple-500/30 backdrop-blur-sm shadow-lg shadow-black/20 transition-all hover:scale-105 active:scale-95 group"
+        className="fixed top-24 right-4 sm:left-4 sm:top-1/2 sm:right-auto sm:-translate-y-1/2 z-40 flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] hover:border-purple-500/30 backdrop-blur-sm shadow-lg shadow-black/20 transition-all hover:scale-105 active:scale-95 group"
         title="Prompt History"
       >
         <HistoryIcon className="w-5 h-5 text-white/70 group-hover:text-white transition-colors" />
@@ -270,7 +270,7 @@ export default function PromptHistory({ onLoad }: PromptHistoryProps) {
       {/* Backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity duration-300"
+          className="fixed inset-0 z-40 bg-black/70 backdrop-blur-md transition-opacity duration-300"
           onClick={() => setIsOpen(false)}
         />
       )}
