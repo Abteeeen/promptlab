@@ -29,6 +29,13 @@ app.use(express.json({ limit: '64kb' }));
 // ── Attach user from token if present (all routes) ──────────────────────────
 app.use(optionalAuth);
 
+// ── Root route ──────────────────────────────────────────────────────────────
+app.get('/', (req, res) => res.json({ 
+  message: 'Prompt Engine API is live.', 
+  version: '1.0.0',
+  documentation: 'Check /health for status' 
+}));
+
 // ── Health check ─────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
 
