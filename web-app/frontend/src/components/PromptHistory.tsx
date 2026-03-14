@@ -201,6 +201,23 @@ export default function PromptHistory({ onLoad }: PromptHistoryProps) {
     setHistory(getHistory())
   }, [])
 
+  const [isVisible, setIsVisible] = useState(true)
+  const [lastScrollY, setLastScrollY] = useState(0)
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY
+      if (currentScrollY > lastScrollY && currentScrollY > 50) {
+        setIsVisible(false)
+      } else {
+        setIsVisible(true)
+      }
+      setLastScrollY(currentScrollY)
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [lastScrollY])
+
   useEffect(() => {
     loadHistory()
     // Listen for storage changes from other tabs
@@ -256,7 +273,9 @@ export default function PromptHistory({ onLoad }: PromptHistoryProps) {
       {/* Floating trigger button */}
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed top-24 right-4 sm:left-4 sm:top-1/2 sm:right-auto sm:-translate-y-1/2 z-40 flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] hover:border-purple-500/30 backdrop-blur-sm shadow-lg shadow-black/20 transition-all hover:scale-105 active:scale-95 group"
+        className={`fixed left-4 top-1/2 -translate-y-1/2 z-40 flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] hover:border-purple-500/30 backdrop-blur-sm shadow-lg shadow-black/20 transition-all duration-300 hover:scale-105 active:scale-95 group ${
+          isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-12 pointer-events-none'
+        }`}
         title="Prompt History"
       >
         <HistoryIcon className="w-5 h-5 text-white/70 group-hover:text-white transition-colors" />

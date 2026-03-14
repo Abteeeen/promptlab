@@ -14,7 +14,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="absolute -bottom-40 left-1/3 w-96 h-96 bg-cyan-600/5 rounded-full blur-3xl" />
       </div>
       <Header />
-      <main className="pt-20 relative z-10">{children}</main>
+      <main className="pt-4 md:pt-20 relative z-10">{children}</main>
       <FeedbackWidget />
     </div>
   )

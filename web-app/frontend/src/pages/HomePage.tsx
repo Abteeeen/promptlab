@@ -435,7 +435,7 @@ function AIGenerator() {
                 {/* Floating options panel — slides up above the bar */}
                 {showOptionsPanel && (
                   <div
-                    className="absolute bottom-full -left-10 sm:left-0 mb-3 w-[calc(100vw-3rem)] sm:w-72 max-w-[320px] rounded-2xl p-4 z-[9999]"
+                    className="absolute bottom-full left-1/2 -translate-x-1/2 sm:left-0 sm:translate-x-0 mb-3 w-[calc(100vw-2rem)] sm:w-72 max-w-[320px] rounded-2xl p-4 z-[9999]"
                     style={{
                       background: 'var(--glass-bg, rgba(15,15,25,0.97))',
                       border: '1px solid var(--glass-border, rgba(139,92,246,0.2))',
